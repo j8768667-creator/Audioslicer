@@ -1,0 +1,6 @@
+{
+  "name": "Slicer - Audio One-Shot & Loop Slicer",
+  "description": "Interactive browser-based audio and sample slicer with transient detection, automatic BPM loop slicing, waveform editor, and ZIP WAV export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

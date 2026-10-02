@@ -1,0 +1,1604 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Slicer - Audio One-Shot &amp; Loop Slicer</title>
+  <meta name="description" content="Browser-based audio and video sample slicer with transient detection, automatic BPM loop slicing, waveform editor, and ZIP WAV export.">
+  <meta property="og:title" content="Slicer - Audio One-Shot &amp; Loop Slicer">
+  <meta property="og:description" content="Browser-based audio and video sample slicer with transient detection, automatic BPM loop slicing, waveform editor, and ZIP WAV export.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'media',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- JSZip for in-browser WAV packaging -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f1f4f8;
+      --pn: #ffffff;
+      --ink: #111827;
+      --mu: #6b7280;
+      --ln: #d1d5db;
+      --ac: #2563eb;
+      --off: #9ca3af;
+      --mk: #ea580c;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1318;
+        --pn: #181d24;
+        --ink: #f3f4f6;
+        --mu: #9ca3af;
+        --ln: #2d3540;
+        --ac: #3b82f6;
+        --off: #4b5563;
+        --mk: #f97316;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    }
+    .pn {
+      background: var(--pn);
+      border: 1px solid var(--ln);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    }
+    input[type=file]::file-selector-button {
+      min-height: 40px;
+      padding: 0 16px;
+      margin-right: 12px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--ac);
+      color: #ffffff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    input[type=file]::file-selector-button:hover {
+      filter: brightness(1.1);
+    }
+    select, input[type=number], input[type=text] {
+      min-height: 42px;
+      font: inherit;
+      color: var(--ink);
+      background: var(--bg);
+      border: 1px solid var(--ln);
+      border-radius: 6px;
+      padding: 0 12px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    select:focus, input[type=number]:focus, input[type=text]:focus {
+      border-color: var(--ac);
+    }
+    button {
+      min-height: 42px;
+      font: inherit;
+      color: var(--ink);
+      background: var(--bg);
+      border: 1px solid var(--ln);
+      border-radius: 6px;
+      padding: 0 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    button:hover:not(:disabled) {
+      filter: brightness(0.96);
+    }
+    button.pri {
+      background: var(--ac);
+      border-color: var(--ac);
+      color: #ffffff;
+      font-weight: 600;
+    }
+    button.pri:hover:not(:disabled) {
+      filter: brightness(1.08);
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .seg {
+      display: flex;
+      width: 100%;
+    }
+    .seg button {
+      flex: 1;
+      border-radius: 0;
+    }
+    .seg button:first-child {
+      border-radius: 6px 0 0 6px;
+    }
+    .seg button:last-child {
+      border-radius: 0 6px 6px 0;
+    }
+    .seg button.act {
+      background: var(--ac);
+      border-color: var(--ac);
+      color: #ffffff;
+      font-weight: 600;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 38px;
+      background: transparent;
+      margin: 0;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 5px;
+      background: var(--off);
+      border-radius: 3px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      margin-top: -8.5px;
+      border-radius: 50%;
+      background: var(--pn);
+      border: 2.5px solid var(--ac);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+    input[type=range]::-moz-range-track {
+      height: 5px;
+      background: var(--off);
+      border-radius: 3px;
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--pn);
+      border: 2.5px solid var(--ac);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 190px;
+      touch-action: none;
+      border-radius: 6px;
+      cursor: crosshair;
+    }
+    #ev {
+      height: 240px;
+      cursor: grab;
+    }
+    #ev:active {
+      cursor: grabbing;
+    }
+    .dropzone-active {
+      border-color: var(--ac) !important;
+      background: rgba(37, 99, 235, 0.08) !important;
+    }
+    .row {
+      display: flex;
+      border: 1px solid var(--ln);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--bg);
+      transition: all 0.15s ease;
+    }
+    .row:hover {
+      border-color: var(--off);
+    }
+    .row.sel {
+      border-color: var(--ac);
+      box-shadow: 0 0 0 1px var(--ac);
+    }
+    .row button {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      min-height: 44px;
+    }
+    .chk {
+      width: 44px;
+      border-right: 1px solid var(--ln) !important;
+      font-weight: 700;
+      color: var(--ac);
+    }
+    .row:not(.on) .nm {
+      color: var(--mu);
+    }
+    .nm {
+      flex: 1;
+      text-align: left;
+      font-variant-numeric: tabular-nums;
+      padding-left: 10px;
+      font-size: 14px;
+    }
+    .hide { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="max-w-[1180px] mx-auto grid gap-3">
+
+  <!-- Header & File Input / Dropzone -->
+  <div class="pn flex flex-wrap gap-4 items-center justify-between" id="dropArea">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+        ✂
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight m-0">Slicer</h1>
+        <p class="text-xs text-[var(--mu)] m-0">High-Precision Audio &amp; Video Sample Slicer</p>
+      </div>
+    </div>
+
+    <div class="flex flex-1 items-center gap-3 min-w-[280px]">
+      <input id="file" type="file" accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.mp4,.mov,.webm" class="text-sm">
+      <div class="meta text-xs text-[var(--mu)] flex-1" id="meta">
+        Drop an audio or video file here, or choose file to begin.
+      </div>
+    </div>
+  </div>
+
+  <!-- Slicer Configuration Panel -->
+  <div class="pn grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-x-5 gap-y-3 items-end" id="ctl">
+    <!-- Mode Selection -->
+    <div class="grid gap-1">
+      <span class="text-xs font-medium text-[var(--mu)] flex justify-between">Mode</span>
+      <div class="seg">
+        <button id="mShot" class="act">One-shots</button>
+        <button id="mLoop">Loops</button>
+      </div>
+    </div>
+
+    <!-- One-shot controls -->
+    <div class="grid gap-1 shot">
+      <label for="sens" class="text-xs font-medium text-[var(--mu)] flex justify-between">
+        Sensitivity <b id="sensV" class="text-[var(--ink)] font-semibold">40 dB</b>
+      </label>
+      <input id="sens" type="range" min="20" max="70" value="40">
+    </div>
+
+    <div class="grid gap-1 shot">
+      <label for="gap" class="text-xs font-medium text-[var(--mu)] flex justify-between">
+        Min gap between hits <b id="gapV" class="text-[var(--ink)] font-semibold">120 ms</b>
+      </label>
+      <input id="gap" type="range" min="20" max="500" step="10" value="120">
+    </div>
+
+    <!-- Loop controls -->
+    <div class="grid gap-1 loop hide">
+      <label for="bars" class="text-xs font-medium text-[var(--mu)]">Loop length</label>
+      <select id="bars">
+        <option value="1">1 bar</option>
+        <option value="2">2 bars</option>
+        <option value="4" selected>4 bars</option>
+        <option value="8">8 bars</option>
+      </select>
+    </div>
+
+    <div class="grid gap-1 loop hide">
+      <label for="bpm" class="text-xs font-medium text-[var(--mu)]">Tempo (BPM)</label>
+      <div class="flex gap-2">
+        <input id="bpm" type="number" min="40" max="240" step="0.1" inputmode="decimal" class="flex-1">
+        <button id="half" title="Half tempo" class="px-2">÷2</button>
+        <button id="dbl" title="Double tempo" class="px-2">×2</button>
+        <button id="det" title="Re-detect BPM">Detect</button>
+      </div>
+    </div>
+
+    <div class="grid gap-1 loop hide">
+      <label for="gsn" class="text-xs font-medium text-[var(--mu)]">Grid snap while dragging</label>
+      <select id="gsn">
+        <option value="0">Off</option>
+        <option value="4">Bar</option>
+        <option value="1" selected>Beat</option>
+        <option value=".5">½ beat</option>
+        <option value=".25">¼ beat</option>
+      </select>
+    </div>
+
+    <!-- Export & Audio Settings -->
+    <div class="grid gap-1">
+      <label for="fade" class="text-xs font-medium text-[var(--mu)]">Fade / crossfade</label>
+      <select id="fade">
+        <option value="0">None</option>
+        <option value="5">5 ms</option>
+        <option value="10" selected>10 ms</option>
+        <option value="20">20 ms</option>
+        <option value="50">50 ms</option>
+        <option value="100">100 ms</option>
+      </select>
+    </div>
+
+    <div class="grid gap-1">
+      <label for="bits" class="text-xs font-medium text-[var(--mu)]">Bit depth</label>
+      <select id="bits">
+        <option value="16">16-bit WAV (Standard)</option>
+        <option value="24">24-bit WAV (Studio Pro)</option>
+      </select>
+    </div>
+
+    <div class="grid gap-1">
+      <label for="norm" class="text-xs font-medium text-[var(--mu)]">Level normalization</label>
+      <select id="norm">
+        <option value="1">Normalise to −1 dBFS</option>
+        <option value="0">Keep original level</option>
+      </select>
+    </div>
+
+    <div class="grid gap-1">
+      <label for="pfx" class="text-xs font-medium text-[var(--mu)]">File name prefix</label>
+      <input id="pfx" type="text" placeholder="Defaults to file name" autocapitalize="off" autocorrect="off">
+    </div>
+  </div>
+
+  <!-- Main Waveform Overview Panel -->
+  <div class="pn p-2" id="cvw">
+    <div class="flex items-center justify-between px-2 py-1 text-xs text-[var(--mu)]">
+      <span>Waveform Overview (Click slice to zoom &amp; edit · Drag boundaries to adjust)</span>
+      <span class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"></span> Active Slice</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-orange-500 inline-block"></span> Marker</span>
+      </span>
+    </div>
+    <canvas id="cv"></canvas>
+  </div>
+
+  <!-- Zoom Slice Editor Panel (Collapsible) -->
+  <div class="pn hide transition-all duration-200" id="ed">
+    <div class="flex flex-wrap gap-2 items-center justify-between pb-2 border-b border-[var(--ln)]">
+      <div class="flex items-center gap-2">
+        <b id="edT" class="text-base font-bold text-[var(--ink)]">Slice</b>
+        <span class="text-xs text-[var(--mu)] font-mono tabular-nums" id="edR"></span>
+      </div>
+      <div class="flex flex-wrap gap-1.5 items-center">
+        <button id="zo" title="Zoom out">Zoom −</button>
+        <button id="zi" title="Zoom in">Zoom +</button>
+        <button id="zf" title="Fit slice to view">Fit</button>
+        <button id="rst" title="Reset slice boundaries">Reset slice</button>
+        <button id="seam" class="loop hide bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 font-semibold" title="Audition loop seam 4 times">Seam ×4</button>
+        <button id="edP" class="pri">▶ Play</button>
+        <button id="edC" class="px-3" title="Close editor">✕ Close</button>
+      </div>
+    </div>
+
+    <div class="my-2">
+      <canvas id="ev"></canvas>
+    </div>
+
+    <!-- Fine Nudge Controls -->
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3 pt-2 border-t border-[var(--ln)]">
+      <div class="grid gap-1">
+        <span class="text-xs text-[var(--mu)] font-medium">Start point micro-nudge</span>
+        <div class="flex gap-1 nud" data-k="s">
+          <button data-d="-0.01" class="flex-1 text-xs">−10 ms</button>
+          <button data-d="-0.001" class="flex-1 text-xs">−1 ms</button>
+          <button data-d="0.001" class="flex-1 text-xs">+1 ms</button>
+          <button data-d="0.01" class="flex-1 text-xs">+10 ms</button>
+        </div>
+      </div>
+      <div class="grid gap-1">
+        <span class="text-xs text-[var(--mu)] font-medium">End point micro-nudge</span>
+        <div class="flex gap-1 nud" data-k="e">
+          <button data-d="-0.01" class="flex-1 text-xs">−10 ms</button>
+          <button data-d="-0.001" class="flex-1 text-xs">−1 ms</button>
+          <button data-d="0.001" class="flex-1 text-xs">+1 ms</button>
+          <button data-d="0.01" class="flex-1 text-xs">+10 ms</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Additional Editor Actions -->
+    <div class="flex flex-wrap gap-2 items-center justify-between pt-3 mt-2 border-t border-[var(--ln)]">
+      <div class="flex flex-wrap gap-2">
+        <button id="snap" class="act text-xs font-semibold">Snap to zero crossing: On</button>
+        <button id="spl" class="text-xs">Split at marker</button>
+        <button id="mrg" class="text-xs">Merge with next</button>
+        <button id="del" class="text-xs text-red-500 border-red-300 dark:border-red-900/50">Delete slice</button>
+      </div>
+      <div class="text-xs text-[var(--mu)]">
+        Pinch to zoom · Drag handles to trim · Drag waveform to pan · Tap waveform to place marker
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Action Bar -->
+  <div class="pn">
+    <div class="flex flex-wrap gap-2 items-center justify-between">
+      <div class="flex flex-wrap gap-2 items-center">
+        <button id="undo" disabled title="Undo last edit (Ctrl/Cmd+Z)">↺ Undo</button>
+        <button id="add" title="Place slice at current marker location">+ Add slice at marker</button>
+        <button id="all">Select all</button>
+        <button id="none">Select none</button>
+      </div>
+
+      <div class="text-sm font-medium text-[var(--mu)]" id="cnt">No slices</div>
+
+      <button id="exp" class="pri px-6" disabled>
+        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        Export ZIP
+      </button>
+    </div>
+    <div id="st" class="text-xs text-[var(--mu)] mt-2 min-h-[18px] font-mono"></div>
+  </div>
+
+  <!-- Slice Grid List -->
+  <div id="list" class="pn grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-2 min-h-[70px]"></div>
+
+</div>
+
+<!-- Application Engine -->
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const HOP = 256;
+  let ph = null, raf = 0, cur = null, fresh = false, ap = {}, g0 = 0, gdiv = 1;
+  let hist = [], ctx = null, buf = null, mono = null, sr = 44100, dur = 0;
+  let E = null, D = null, O = null, peaks = null, regions = [];
+  let mode = 'shot', name = 'audio', bpm = 0, sel = -1, drag = null, playing = null;
+  let W = 0, H = 0, dpr = 1;
+
+  const st = m => { $('#st').textContent = m; };
+  const pad = n => String(n).padStart(2, '0');
+
+  /* ---------- Drag & Drop and File Load ---------- */
+  const dropArea = $('#dropArea');
+  ['dragenter', 'dragover'].forEach(eventName => {
+    window.addEventListener(eventName, e => {
+      e.preventDefault();
+      dropArea.classList.add('dropzone-active');
+    }, false);
+  });
+  ['dragleave', 'drop'].forEach(eventName => {
+    window.addEventListener(eventName, e => {
+      e.preventDefault();
+      dropArea.classList.remove('dropzone-active');
+    }, false);
+  });
+  window.addEventListener('drop', e => {
+    const dt = e.dataTransfer;
+    if (dt && dt.files && dt.files[0]) {
+      loadFile(dt.files[0]);
+    }
+  });
+
+  $('#file').onchange = e => {
+    const f = e.target.files[0];
+    if (f) loadFile(f);
+  };
+
+  async function loadFile(f) {
+    stop();
+    st('Decoding audio file…');
+    try {
+      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+      const arrayBuf = await f.arrayBuffer();
+      buf = await ctx.decodeAudioData(arrayBuf);
+    } catch (err) {
+      st('Could not decode audio. Try standard WAV, MP3, M4A, FLAC, or MP4 formats.');
+      return;
+    }
+
+    name = f.name.replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_') || 'audio';
+    sr = buf.sampleRate;
+    dur = buf.duration;
+    bpm = 0;
+
+    const n = buf.length;
+    mono = new Float32Array(n);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < n; i++) mono[i] += d[i] / buf.numberOfChannels;
+    }
+
+    envelope();
+    buildPeaks();
+    $('#meta').textContent = `${f.name} · ${dur.toFixed(1)} s · ${(sr / 1000).toFixed(1)} kHz · ${buf.numberOfChannels} ch`;
+    analyse();
+    offerRestore();
+  }
+
+  /* ---------- Audio Analysis ---------- */
+  function envelope() {
+    const n = Math.floor(mono.length / HOP);
+    E = new Float32Array(n);
+    D = new Float32Array(n);
+    O = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      let s = 0;
+      const a = i * HOP, b = Math.min(mono.length, a + HOP * 2);
+      for (let j = a; j < b; j++) s += mono[j] * mono[j];
+      E[i] = Math.sqrt(s / (b - a || 1));
+      D[i] = 20 * Math.log10(E[i] + 1e-9);
+    }
+    let pk = -200;
+    for (let i = 0; i < n; i++) if (D[i] > pk) pk = D[i];
+    for (let i = 1; i < n; i++) O[i] = Math.max(0, Math.max(D[i], pk - 70) - Math.max(D[i - 1], pk - 70));
+  }
+
+  function buildPeaks() {
+    const N = 4000, per = mono.length / N;
+    peaks = new Float32Array(N * 2);
+    for (let k = 0; k < N; k++) {
+      let lo = 0, hi = 0;
+      const a = Math.floor(k * per), b = Math.min(mono.length, Math.floor((k + 1) * per));
+      for (let i = a; i < b; i++) {
+        const v = mono[i];
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      peaks[k * 2] = lo;
+      peaks[k * 2 + 1] = hi;
+    }
+  }
+
+  function analyse(auto) {
+    if (!buf) return;
+    stop();
+    sel = -1;
+    closeEd();
+    if (mode === 'shot') {
+      regions = shots();
+    } else {
+      if (auto || !bpm) {
+        bpm = detect();
+        $('#bpm').value = bpm.toFixed(1);
+      }
+      regions = grid(bpm);
+    }
+    regions.forEach(r => { r.s0 = r.s; r.e0 = r.e; });
+    hist = [];
+    cur = null;
+    fresh = true;
+    $('#exp').disabled = false;
+    refresh();
+  }
+
+  function shots() {
+    const sens = +$('#sens').value;
+    const gap = Math.max(2, Math.round(+$('#gap').value / 1000 * sr / HOP));
+    const n = D.length, out = [];
+    let pk = -200;
+    for (let i = 0; i < n; i++) if (D[i] > pk) pk = D[i];
+    const thr = pk - sens;
+    let s = -1, below = 0, top = 0, lm = 0, lmi = 0;
+
+    const push = (a, b) => {
+      const t0 = Math.max(0, a * HOP / sr - 0.004);
+      const t1 = Math.min(dur, Math.min((b * HOP + HOP * 2) / sr, t0 + 8));
+      if (t1 - t0 >= 0.03) out.push({ s: t0, e: t1, on: true });
+    };
+
+    for (let i = 0; i < n; i++) {
+      if (s < 0) {
+        if (D[i] > thr) {
+          s = i; below = 0; top = lm = D[i]; lmi = i;
+        }
+        continue;
+      }
+      if (D[i] < thr) {
+        below++;
+        if (below >= gap) {
+          push(s, i - below + 1);
+          s = -1;
+        }
+        continue;
+      }
+      below = 0;
+      if (D[i] > top) {
+        top = D[i]; lm = D[i]; lmi = i;
+      } else if (D[i] < lm) {
+        lm = D[i]; lmi = i;
+      } else if (D[i] - lm > 9 && lmi - s >= Math.max(4, gap >> 1)) {
+        push(s, lmi);
+        s = lmi;
+        top = lm = D[i];
+        lmi = i;
+      }
+    }
+    if (s >= 0) push(s, n - 1);
+    return out;
+  }
+
+  function detect() {
+    const n = O.length, fr = sr / HOP;
+    const lo = Math.floor(fr * 60 / 180);
+    const hi = Math.min(Math.ceil(fr), n >> 2);
+    const cache = {};
+    const ac = L => {
+      if (cache[L] !== undefined) return cache[L];
+      let s = 0;
+      for (let i = 0; i + L < n; i++) s += O[i] * O[i + L];
+      return cache[L] = s / (n - L);
+    };
+    const sc = {};
+    let best = lo;
+    for (let L = lo - 1; L <= hi + 1; L++) {
+      const b = 60 * fr / L;
+      const w = Math.exp(-0.5 * Math.pow(Math.log2(b / 120) / 0.9, 2));
+      sc[L] = (ac(L) + 0.5 * ac(2 * L)) * w;
+      if (L >= lo && L <= hi && sc[L] > sc[best]) best = L;
+    }
+    let L = best;
+    const a = sc[best - 1], b = sc[best], c = sc[best + 1], d = a - 2 * b + c;
+    if (d && best > lo && best < hi) {
+      const o = (a - c) / (2 * d);
+      if (Math.abs(o) < 1) L += o;
+    }
+    let v = 60 * fr / L;
+    if (Math.abs(v - Math.round(v)) < 0.15) v = Math.round(v);
+    return Math.round(v * 10) / 10;
+  }
+
+  function grid(b) {
+    const fr = sr / HOP, P = 60 * fr / b, n = O.length, bars = +$('#bars').value;
+    const at = x => {
+      const i = Math.round(x);
+      return i >= 0 && i < n ? Math.max(O[i], O[i - 1] || 0, O[i + 1] || 0) : 0;
+    };
+    let ph0 = 0, bs = -1;
+    for (let p = 0; p < P; p++) {
+      let s = 0;
+      for (let k = 0; p + k * P < n; k++) s += at(p + k * P);
+      if (s > bs) { bs = s; ph0 = p; }
+    }
+    let bi = 0; bs = -1;
+    for (let j = 0; j < 4; j++) {
+      let s = 0;
+      for (let k = 0; ph0 + j * P + k * 4 * P < n; k++) s += at(ph0 + j * P + k * 4 * P);
+      if (s > bs) { bs = s; bi = j; }
+    }
+    const off = ((ph0 + bi * P) * HOP + HOP) / sr;
+    const L = bars * 4 * 60 / b, out = [];
+    g0 = off;
+    for (let t = off; t + L <= dur + 0.01; t += L) {
+      out.push({ s: t, e: Math.min(dur, t + L), on: true });
+    }
+    const lv = out.map(rmsDb), mx = Math.max(...lv, -200);
+    out.forEach((r, i) => r.on = lv[i] > mx - 15);
+    return out;
+  }
+
+  function rmsDb(r) {
+    const a = Math.floor(r.s * sr), b = Math.min(mono.length, Math.floor(r.e * sr));
+    let s = 0;
+    for (let i = a; i < b; i += 2) s += mono[i] * mono[i];
+    return 20 * Math.log10(Math.sqrt(s / Math.max(1, (b - a) / 2)) + 1e-9);
+  }
+
+  /* ---------- Waveform Rendering & Interaction ---------- */
+  function size() {
+    const c = $('#cv');
+    dpr = window.devicePixelRatio || 1;
+    W = c.clientWidth;
+    H = c.clientHeight;
+    c.width = W * dpr;
+    c.height = H * dpr;
+  }
+
+  function draw() {
+    const c = $('#cv');
+    if (!W) size();
+    const g = c.getContext('2d'), cs = getComputedStyle(document.body);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+
+    if (!buf) {
+      g.fillStyle = cs.getPropertyValue('--mu');
+      g.font = '500 14px sans-serif';
+      g.textAlign = 'center';
+      g.fillText('Drop an audio file or click "Choose File" above to load waveform', W / 2, H / 2);
+      return;
+    }
+
+    const ac = cs.getPropertyValue('--ac').trim();
+    const off = cs.getPropertyValue('--off').trim();
+    const ink = cs.getPropertyValue('--ink').trim();
+    const m = H / 2, N = peaks.length / 2;
+
+    regions.forEach((r, i) => {
+      const x0 = r.s / dur * W, x1 = r.e / dur * W;
+      g.globalAlpha = r.on ? 0.18 : 0.07;
+      g.fillStyle = r.on ? ac : off;
+      g.fillRect(x0, 0, x1 - x0, H);
+      if (i === sel) {
+        g.globalAlpha = 0.32;
+        g.fillRect(x0, 0, x1 - x0, H);
+      }
+    });
+
+    gridLines(g, 0, dur, W, H, t => t / dur * W, ink);
+
+    g.globalAlpha = 0.85;
+    g.fillStyle = ink;
+    for (let x = 0; x < W; x++) {
+      const k = Math.min(N - 1, Math.floor(x / W * N));
+      g.fillRect(x, m + peaks[k * 2] * m * 0.95, 1, Math.max(1, (peaks[k * 2 + 1] - peaks[k * 2]) * m * 0.95));
+    }
+
+    g.globalAlpha = 1;
+    regions.forEach(r => {
+      [r.s, r.e].forEach((t, j) => {
+        const x = Math.round(t / dur * W);
+        g.fillStyle = r.on ? ac : off;
+        g.fillRect(x - 1, 0, 2, H);
+        g.fillRect(x - (j ? 9 : -1), m - 14, 8, 28);
+      });
+    });
+
+    marks(g, t => t / dur * W, H, 0, dur);
+  }
+
+  function edgeAt(x) {
+    let best = null, bd = 22;
+    regions.forEach((r, i) => {
+      ['s', 'e'].forEach(k => {
+        const d = Math.abs(r[k] / dur * W - x);
+        if (d < bd) { bd = d; best = { i, k }; }
+      });
+    });
+    return best;
+  }
+
+  const cv = $('#cv');
+  cv.addEventListener('pointerdown', e => {
+    if (!buf) return;
+    const x = e.clientX - cv.getBoundingClientRect().left;
+    cv.setPointerCapture(e.pointerId);
+    const h = edgeAt(x);
+    if (h) {
+      drag = { ...h, moved: false };
+      sel = h.i;
+    } else {
+      const t = x / W * dur;
+      const i = regions.findIndex(r => t >= r.s && t <= r.e);
+      if (i >= 0) {
+        sel = i;
+        play(regions[i]);
+        openEd(i);
+      } else {
+        sel = -1;
+        cur = t;
+        closeEd();
+      }
+      drag = null;
+      list();
+    }
+    draw();
+  });
+
+  cv.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const x = e.clientX - cv.getBoundingClientRect().left;
+    const r = regions[drag.i];
+    const t = gs(Math.max(0, Math.min(dur, x / W * dur)));
+    if (!drag.moved) pushHist();
+    drag.moved = true;
+    r.manual = true;
+    if (drag.k === 's') r.s = Math.min(t, r.e - 0.01);
+    else r.e = Math.max(t, r.s + 0.01);
+    draw();
+  });
+
+  const endDrag = () => {
+    if (drag && drag.moved) {
+      if (!gridOn()) snapEdge(regions[drag.i], drag.k);
+      refresh();
+    }
+    drag = null;
+  };
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+
+  /* ---------- Slices List ---------- */
+  function list() {
+    $('#list').innerHTML = regions.length ? regions.map((r, i) => `
+      <div class="row${r.on ? ' on' : ''}${i === sel ? ' sel' : ''}">
+        <button class="chk" data-t="${i}" aria-label="Include slice ${i + 1}">${r.on ? '✓' : ''}</button>
+        <button class="nm" data-p="${i}">${mode === 'loop' ? 'Loop' : 'Shot'} ${pad(i + 1)} · ${(r.e - r.s).toFixed(2)} s · ${rmsDb(r).toFixed(0)} dB</button>
+      </div>
+    `).join('') : '<span class="text-sm text-[var(--mu)] col-span-full py-2">No slices found. Try raising sensitivity or lowering minimum gap.</span>';
+
+    const n = regions.filter(r => r.on).length;
+    $('#cnt').textContent = `${n} of ${regions.length} selected` + (mode === 'loop' && bpm ? ` · ${bpm} BPM` : '');
+  }
+
+  function refresh() {
+    list();
+    draw();
+    drawEd();
+    $('#undo').disabled = !hist.length;
+    if (!fresh) save();
+    fresh = false;
+  }
+
+  $('#list').addEventListener('click', e => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.dataset.t !== undefined) {
+      pushHist();
+      const r = regions[+t.dataset.t];
+      r.on = !r.on;
+      refresh();
+    } else if (t.dataset.p !== undefined) {
+      sel = +t.dataset.p;
+      play(regions[sel]);
+      openEd(sel);
+    }
+  });
+
+  $('#all').onclick = () => {
+    pushHist();
+    regions.forEach(r => r.on = true);
+    refresh();
+  };
+  $('#none').onclick = () => {
+    pushHist();
+    regions.forEach(r => r.on = false);
+    refresh();
+  };
+
+  /* ---------- Preview Playback ---------- */
+  function stop() {
+    ph = null;
+    if (playing) {
+      try {
+        playing.onended = null;
+        playing.stop();
+      } catch (e) {}
+      playing = null;
+    }
+  }
+
+  function play(r) {
+    if (!buf) return;
+    stop();
+    if (ctx.state !== 'running') ctx.resume();
+    const s = ctx.createBufferSource();
+    s.buffer = buf;
+    s.connect(ctx.destination);
+    if (mode === 'loop') {
+      s.loop = true;
+      s.loopStart = r.s;
+      s.loopEnd = r.e;
+      s.start(0, r.s);
+    } else {
+      s.start(0, r.s, r.e - r.s);
+    }
+    s.onended = () => {
+      if (playing === s) {
+        playing = null;
+        ph = null;
+        draw();
+        drawEd();
+      }
+    };
+    playing = s;
+    ph = { t0: ctx.currentTime, r, loop: mode === 'loop' };
+    startTick();
+  }
+
+  /* ---------- Controls & UI Mode ---------- */
+  function uiMode() {
+    $('#mShot').classList.toggle('act', mode === 'shot');
+    $('#mLoop').classList.toggle('act', mode === 'loop');
+    document.querySelectorAll('.shot').forEach(x => x.classList.toggle('hide', mode !== 'shot'));
+    document.querySelectorAll('.loop').forEach(x => x.classList.toggle('hide', mode !== 'loop'));
+  }
+
+  function setMode(m) {
+    if (m === mode || !guard()) return;
+    mode = m;
+    uiMode();
+    if (m === 'loop' && $('#fade').value === '0') $('#fade').value = '10';
+    size();
+    analyse();
+  }
+
+  $('#mShot').onclick = () => setMode('shot');
+  $('#mLoop').onclick = () => setMode('loop');
+  $('#sens').oninput = e => $('#sensV').textContent = e.target.value + ' dB';
+  $('#gap').oninput = e => $('#gapV').textContent = e.target.value + ' ms';
+
+  ['sens', 'gap', 'bars'].forEach(id => {
+    const el = $('#' + id);
+    ap[id] = el.value;
+    el.onchange = () => {
+      if (!guard()) {
+        el.value = ap[id];
+        el.dispatchEvent(new Event('input'));
+        return;
+      }
+      ap[id] = el.value;
+      analyse();
+    };
+  });
+
+  $('#det').onclick = () => { if (guard()) analyse(true); };
+  $('#bpm').onchange = e => {
+    const v = parseFloat(e.target.value);
+    if (v >= 40 && v <= 240) {
+      if (!guard()) {
+        e.target.value = bpm.toFixed(1);
+        return;
+      }
+      bpm = v;
+      analyse();
+    }
+  };
+
+  const setBpm = v => {
+    if (!buf || !bpm || !guard()) return;
+    bpm = Math.round(Math.max(40, Math.min(240, v)) * 10) / 10;
+    $('#bpm').value = bpm.toFixed(1);
+    analyse();
+  };
+  $('#half').onclick = () => setBpm(bpm / 2);
+  $('#dbl').onclick = () => setBpm(bpm * 2);
+
+  window.addEventListener('resize', () => {
+    size();
+    draw();
+    if (edOpen) {
+      sizeEd();
+      drawEd();
+    }
+  });
+
+  /* ---------- Playhead & Markers ---------- */
+  const guard = () => !hist.length || confirm('Re-analysing discards your manual edits. Continue?');
+  const phPos = () => {
+    if (!ph || !ctx) return null;
+    const L = Math.max(0.001, ph.r.e - ph.r.s), el = ctx.currentTime - ph.t0;
+    return ph.r.s + (ph.loop ? el % L : Math.min(el, L));
+  };
+
+  function startTick() {
+    cancelAnimationFrame(raf);
+    const f = () => {
+      if (!ph) return;
+      draw();
+      drawEd();
+      raf = requestAnimationFrame(f);
+    };
+    raf = requestAnimationFrame(f);
+  }
+
+  function marks(g, X, Hh, a, b) {
+    const cs = getComputedStyle(document.body);
+    const mk = cs.getPropertyValue('--mk').trim();
+    const ink = cs.getPropertyValue('--ink').trim();
+    g.globalAlpha = 1;
+    if (cur !== null && cur >= a && cur <= b) {
+      g.fillStyle = mk;
+      g.fillRect(X(cur) - 1, 0, 2, Hh);
+      g.fillRect(X(cur) - 6, 0, 12, 6);
+    }
+    const p = phPos();
+    if (p !== null && p >= a && p <= b) {
+      g.fillStyle = ink;
+      g.fillRect(X(p) - 1, 0, 2, Hh);
+    }
+  }
+
+  /* ---------- Slice Actions ---------- */
+  $('#spl').onclick = () => {
+    const r = regions[sel];
+    if (!r || cur === null || cur <= r.s + 0.001 || cur >= r.e - 0.001) {
+      st('Tap the waveform to place a marker inside the slice, then split.');
+      return;
+    }
+    pushHist();
+    regions.splice(sel, 1, { ...r, e: cur, e0: cur, manual: true }, { ...r, s: cur, s0: cur, manual: true });
+    cur = null;
+    fitEd();
+    refresh();
+  };
+
+  $('#mrg').onclick = () => {
+    const r = regions[sel], n = regions[sel + 1];
+    if (!r || !n) {
+      st('There is no next slice to merge with.');
+      return;
+    }
+    pushHist();
+    regions.splice(sel, 2, { s: r.s, e: n.e, on: r.on || n.on, manual: true, s0: r.s0, e0: n.e0 });
+    fitEd();
+    refresh();
+  };
+
+  $('#del').onclick = () => {
+    if (!regions[sel]) return;
+    pushHist();
+    regions.splice(sel, 1);
+    closeEd();
+    sel = -1;
+    refresh();
+  };
+
+  $('#add').onclick = () => {
+    if (!buf) return;
+    if (cur === null) {
+      st('Tap an empty section of the waveform to place a marker first.');
+      return;
+    }
+    const L = mode === 'loop' && bpm ? (+$('#bars').value) * 4 * 60 / bpm : 0.25;
+    const nx = regions.filter(r => r.s > cur).reduce((m, r) => Math.min(m, r.s), dur);
+    const e = Math.min(cur + L, nx, dur);
+    if (e - cur < 0.01) {
+      st('No room for a slice at the current marker.');
+      return;
+    }
+    pushHist();
+    const n = { s: cur, e, on: true, manual: true, s0: cur, e0: e };
+    regions.push(n);
+    regions.sort((a, b) => a.s - b.s);
+    cur = null;
+    refresh();
+    openEd(regions.indexOf(n));
+  };
+
+  /* ---------- Persistence & History ---------- */
+  const skey = () => `slicer:${name}:${buf.length}:${sr}`;
+  function save() {
+    if (!buf) return;
+    try {
+      localStorage.setItem(skey(), JSON.stringify({ mode, bpm, g0, bars: $('#bars').value, regions }));
+    } catch (e) {}
+  }
+
+  function offerRestore() {
+    try {
+      const d = JSON.parse(localStorage.getItem(skey()) || 'null');
+      if (d && d.regions && d.regions.length && confirm('Saved slice markers were found for this file. Restore them?')) {
+        restore(d);
+      }
+    } catch (e) {}
+  }
+
+  function restore(d) {
+    stop();
+    mode = d.mode;
+    bpm = d.bpm || 0;
+    g0 = d.g0 || 0;
+    regions = d.regions;
+    hist = [];
+    sel = -1;
+    cur = null;
+    closeEd();
+    $('#bars').value = d.bars;
+    ap.bars = d.bars;
+    $('#bpm').value = bpm ? bpm.toFixed(1) : '';
+    uiMode();
+    size();
+    $('#exp').disabled = false;
+    refresh();
+  }
+
+  function pushHist() {
+    hist.push(JSON.stringify(regions));
+    if (hist.length > 50) hist.shift();
+  }
+
+  const gridOn = () => mode === 'loop' && bpm > 0 && gdiv > 0;
+  const gs = t => {
+    if (!gridOn()) return t;
+    const u = 60 / bpm * gdiv;
+    return Math.max(0, Math.min(dur, g0 + Math.round((t - g0) / u) * u));
+  };
+
+  function gridLines(g, x0, x1, Wpx, Hh, X, col) {
+    if (mode !== 'loop' || !bpm) return;
+    const bt = 60 / bpm;
+    if (bt * Wpx / (x1 - x0) < 5) return;
+    g.fillStyle = col;
+    for (let k = Math.ceil((x0 - g0) / bt); g0 + k * bt <= x1; k++) {
+      const bar = ((k % 4) + 4) % 4 === 0;
+      g.globalAlpha = bar ? 0.55 : 0.25;
+      g.fillRect(Math.round(X(g0 + k * bt)), bar ? 0 : Hh * 0.3, 1, bar ? Hh : Hh * 0.4);
+    }
+    g.globalAlpha = 1;
+  }
+
+  $('#undo').onclick = () => {
+    if (!hist.length) return;
+    regions = JSON.parse(hist.pop());
+    if (sel >= regions.length) sel = -1;
+    refresh();
+  };
+
+  $('#gsn').onchange = e => { gdiv = +e.target.value; };
+  $('#rst').onclick = () => {
+    const r = regions[sel];
+    if (!r) return;
+    pushHist();
+    r.s = r.s0;
+    r.e = r.e0;
+    r.manual = false;
+    refresh();
+  };
+
+  $('#seam').onclick = () => {
+    const r = regions[sel];
+    if (!r || !buf) return;
+    stop();
+    if (ctx.state !== 'running') ctx.resume();
+    const chs = render(r);
+    const b = ctx.createBuffer(chs.length, chs[0].length, sr);
+    chs.forEach((c, i) => b.copyToChannel(c, i));
+    const s = ctx.createBufferSource();
+    s.buffer = b;
+    s.loop = true;
+    s.connect(ctx.destination);
+    s.start();
+    s.stop(ctx.currentTime + b.duration * 4);
+    s.onended = () => {
+      if (playing === s) {
+        playing = null;
+        ph = null;
+        draw();
+        drawEd();
+      }
+    };
+    playing = s;
+    ph = { t0: ctx.currentTime, r, loop: true };
+    startTick();
+    st('Auditioning loop 4 times with export crossfade applied.');
+  };
+
+  /* ---------- Zoom Waveform Editor ---------- */
+  let edOpen = false, vs = 0, ve = 1, snapOn = true, W2 = 0, H2 = 0, eg = null;
+  const ptr = new Map(), ev = $('#ev');
+
+  function sizeEd() {
+    W2 = ev.clientWidth;
+    H2 = ev.clientHeight;
+    ev.width = W2 * dpr;
+    ev.height = H2 * dpr;
+  }
+
+  function openEd(i) {
+    sel = i;
+    edOpen = true;
+    $('#ed').classList.remove('hide');
+    sizeEd();
+    fitEd();
+    list();
+    draw();
+  }
+
+  function closeEd() {
+    edOpen = false;
+    eg = null;
+    ptr.clear();
+    $('#ed').classList.add('hide');
+  }
+
+  function fitEd() {
+    const r = regions[sel];
+    if (!r) return;
+    const p = Math.max(0.02, (r.e - r.s) * 0.25);
+    vs = Math.max(0, r.s - p);
+    ve = Math.min(dur, r.e + p);
+    drawEd();
+  }
+
+  function clampView() {
+    let sp = Math.max(0.002, Math.min(dur, ve - vs));
+    if (vs < 0) vs = 0;
+    ve = vs + sp;
+    if (ve > dur) { ve = dur; vs = dur - sp; }
+  }
+
+  function zoomBy(f, cx) {
+    cx = cx === undefined ? W2 / 2 : cx;
+    const sp = ve - vs, tc = vs + cx / W2 * sp, n = Math.max(0.002, Math.min(dur, sp * f));
+    vs = tc - cx / W2 * n;
+    ve = vs + n;
+    clampView();
+    drawEd();
+  }
+
+  function drawEd() {
+    const r = regions[sel];
+    if (!edOpen || !r || !buf) return;
+    if (!W2) sizeEd();
+    const g = ev.getContext('2d'), cs = getComputedStyle(document.body);
+    const v = k => cs.getPropertyValue(k).trim();
+    const ac = v('--ac'), off = v('--off'), ink = v('--ink'), mu = v('--mu');
+    const span = ve - vs, m = H2 / 2, X = t => (t - vs) / span * W2;
+
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W2, H2);
+
+    g.globalAlpha = 0.18;
+    g.fillStyle = r.on ? ac : off;
+    g.fillRect(X(r.s), 0, X(r.e) - X(r.s), H2);
+
+    gridLines(g, vs, ve, W2, H2, X, ink);
+
+    g.globalAlpha = 0.25;
+    g.fillStyle = ink;
+    g.fillRect(0, m, W2, 1);
+
+    g.globalAlpha = 0.9;
+    const step = Math.max(1, Math.floor(span * sr / W2 / 48));
+    for (let x = 0; x < W2; x++) {
+      const a = Math.max(0, Math.floor((vs + x / W2 * span) * sr));
+      const b = Math.min(mono.length, Math.max(Math.floor((vs + (x + 1) / W2 * span) * sr), a + 2));
+      if (a >= mono.length - 1) break;
+      let lo = mono[a], hi = lo;
+      for (let i = a; i < b; i += step) {
+        const q = mono[i];
+        if (q < lo) lo = q;
+        if (q > hi) hi = q;
+      }
+      g.fillRect(x, m - hi * m * 0.95, 1, Math.max(1, (hi - lo) * m * 0.95));
+    }
+
+    g.globalAlpha = 1;
+    g.fillStyle = r.on ? ac : off;
+    [['s', r.s], ['e', r.e]].forEach(([k, t]) => {
+      const x = X(t);
+      if (x < -20 || x > W2 + 20) return;
+      g.fillRect(x - 1.5, 0, 3, H2);
+      g.fillRect(k === 's' ? x : x - 14, m - 28, 14, 56);
+    });
+
+    marks(g, X, H2, vs, ve);
+
+    g.fillStyle = mu;
+    g.font = '11px monospace';
+    g.textAlign = 'left';
+    g.fillText(vs.toFixed(3) + ' s', 6, H2 - 6);
+    g.textAlign = 'right';
+    g.fillText(ve.toFixed(3) + ' s', W2 - 6, H2 - 6);
+
+    $('#edT').textContent = (mode === 'loop' ? 'Loop ' : 'Shot ') + pad(sel + 1);
+    $('#edR').textContent = `Start ${r.s.toFixed(4)} s · End ${r.e.toFixed(4)} s · Length ${(r.e - r.s).toFixed(4)} s`;
+  }
+
+  function snapEdge(r, k) {
+    if (!snapOn) return;
+    const i0 = Math.round(r[k] * sr), R = Math.round(0.002 * sr);
+    for (let d = 0; d <= R; d++) {
+      for (const i of [i0 - d, i0 + d]) {
+        if (i >= 0 && i < mono.length - 1 && (mono[i] < 0) !== (mono[i + 1] < 0)) {
+          const t = (i + 1) / sr;
+          if (k === 's' ? t < r.e - 0.001 : t > r.s + 0.001) {
+            r[k] = Math.min(dur, t);
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  const pt = e => ({ x: e.clientX - ev.getBoundingClientRect().left, y: e.clientY });
+
+  ev.addEventListener('pointerdown', e => {
+    if (!edOpen) return;
+    ev.setPointerCapture(e.pointerId);
+    const p = pt(e);
+    ptr.set(e.pointerId, p);
+    if (ptr.size === 2) {
+      const [a, b] = [...ptr.values()];
+      eg = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, vs0: vs, ve0: ve, m0: (a.x + b.x) / 2 };
+      return;
+    }
+    const r = regions[sel], span = ve - vs;
+    let k = null, bd = 24;
+    ['s', 'e'].forEach(q => {
+      const d = Math.abs((r[q] - vs) / span * W2 - p.x);
+      if (d < bd) { bd = d; k = q; }
+    });
+    eg = k ? { k, moved: false } : { pan: true, x0: p.x, vs0: vs, ve0: ve };
+  });
+
+  ev.addEventListener('pointermove', e => {
+    if (!ptr.has(e.pointerId) || !eg) return;
+    const p = pt(e);
+    ptr.set(e.pointerId, p);
+    const r = regions[sel];
+    if (ptr.size >= 2 && eg.d0) {
+      const [a, b] = [...ptr.values()], d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      const mx = (a.x + b.x) / 2, sp0 = eg.ve0 - eg.vs0;
+      const sp = Math.max(0.002, Math.min(dur, sp0 * eg.d0 / d)), tc = eg.vs0 + eg.m0 / W2 * sp0;
+      vs = tc - mx / W2 * sp;
+      ve = vs + sp;
+      clampView();
+    } else if (eg.k) {
+      const t = gs(Math.max(0, Math.min(dur, vs + p.x / W2 * (ve - vs))));
+      if (!eg.moved) pushHist();
+      eg.moved = true;
+      r.manual = true;
+      if (eg.k === 's') r.s = Math.min(t, r.e - 0.001);
+      else r.e = Math.max(t, r.s + 0.001);
+      draw();
+    } else if (eg.pan) {
+      eg.mv = true;
+      const sp = eg.ve0 - eg.vs0;
+      vs = eg.vs0 - (p.x - eg.x0) / W2 * sp;
+      ve = vs + sp;
+      clampView();
+    }
+    drawEd();
+  });
+
+  const edUp = e => {
+    ptr.delete(e.pointerId);
+    if (eg && eg.k && eg.moved && ptr.size === 0) {
+      if (!gridOn()) snapEdge(regions[sel], eg.k);
+      refresh();
+    }
+    if (eg && eg.pan && !eg.mv && ptr.size === 0) {
+      cur = Math.max(0, Math.min(dur, eg.vs0 + eg.x0 / W2 * (eg.ve0 - eg.vs0)));
+      draw();
+      drawEd();
+    }
+    if (ptr.size === 0) {
+      eg = null;
+    } else if (ptr.size === 1) {
+      eg = { pan: true, mv: true, x0: [...ptr.values()][0].x, vs0: vs, ve0: ve };
+    }
+  };
+
+  ev.addEventListener('pointerup', edUp);
+  ev.addEventListener('pointercancel', edUp);
+  ev.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomBy(e.deltaY > 0 ? 1.25 : 0.8, pt(e).x);
+  }, { passive: false });
+
+  $('#zi').onclick = () => zoomBy(0.5);
+  $('#zo').onclick = () => zoomBy(2);
+  $('#zf').onclick = fitEd;
+  $('#edP').onclick = () => { if (regions[sel]) play(regions[sel]); };
+  $('#edC').onclick = () => { closeEd(); sel = -1; refresh(); };
+
+  $('#snap').onclick = e => {
+    snapOn = !snapOn;
+    e.target.classList.toggle('act', snapOn);
+    e.target.textContent = 'Snap to zero crossing: ' + (snapOn ? 'On' : 'Off');
+  };
+
+  document.querySelectorAll('.nud').forEach(box => {
+    box.onclick = e => {
+      const b = e.target.closest('button');
+      if (!b || sel < 0) return;
+      const r = regions[sel], k = box.dataset.k, d = +b.dataset.d;
+      pushHist();
+      r.manual = true;
+      if (k === 's') r.s = Math.max(0, Math.min(r.e - 0.001, r.s + d));
+      else r.e = Math.min(dur, Math.max(r.s + 0.001, r.e + d));
+      const sp = ve - vs;
+      if (r[k] < vs || r[k] > ve) {
+        vs = r[k] - sp / 2;
+        ve = vs + sp;
+        clampView();
+      }
+      refresh();
+    };
+  });
+
+  /* ---------- Keyboard Shortcuts ---------- */
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (playing) {
+        stop();
+      } else if (sel >= 0 && regions[sel]) {
+        play(regions[sel]);
+      }
+    } else if (e.code === 'Escape') {
+      if (edOpen) {
+        closeEd();
+        sel = -1;
+        refresh();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      $('#undo').click();
+    }
+  });
+
+  /* ---------- Export & Audio Synthesis ---------- */
+  function render(r) {
+    const s0 = Math.round(r.s * sr);
+    const e = Math.round(r.e * sr);
+    const fade = Math.round(+$('#fade').value / 1000 * sr);
+    const chs = Math.min(2, buf.numberOfChannels);
+    let s = s0;
+
+    if (mode === 'shot' && !r.manual) {
+      const lim = Math.min(e - 2, s0 + Math.round(0.003 * sr));
+      for (let i = s0; i < lim; i++) {
+        if ((mono[i] < 0) !== (mono[i + 1] < 0)) {
+          s = i + 1;
+          break;
+        }
+      }
+    }
+
+    const n = e - s, out = [];
+    for (let c = 0; c < chs; c++) {
+      const src = buf.getChannelData(c);
+      const o = new Float32Array(n);
+      for (let i = 0; i < n; i++) o[i] = src[s + i];
+
+      if (mode === 'loop') {
+        const x = Math.min(fade, n >> 2);
+        if (x > 0 && e + x <= src.length) {
+          for (let i = 0; i < x; i++) {
+            const w = i / x;
+            o[i] = src[s + i] * w + src[e + i] * (1 - w);
+          }
+        } else {
+          const f = Math.min(fade || 64, n >> 2);
+          for (let i = 0; i < f; i++) {
+            o[i] *= i / f;
+            o[n - 1 - i] *= i / f;
+          }
+        }
+      } else {
+        const fi = Math.min(Math.round(0.002 * sr), n >> 1);
+        const fo = Math.min(fade || Math.round(0.002 * sr), n >> 1);
+        for (let i = 0; i < fi; i++) o[i] *= i / fi;
+        for (let i = 0; i < fo; i++) o[n - 1 - i] *= i / fo;
+      }
+      out.push(o);
+    }
+    return out;
+  }
+
+  function wav(chs, bits) {
+    const n = chs[0].length, c = chs.length, B = bits / 8;
+    const ds = n * c * B;
+    const b = new ArrayBuffer(44 + ds);
+    const v = new DataView(b);
+
+    const w = (o, t) => {
+      for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i));
+    };
+
+    w(0, 'RIFF');
+    v.setUint32(4, 36 + ds, true);
+    w(8, 'WAVEfmt ');
+    v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true);
+    v.setUint16(22, c, true);
+    v.setUint32(24, sr, true);
+    v.setUint32(28, sr * c * B, true);
+    v.setUint16(32, c * B, true);
+    v.setUint16(34, bits, true);
+    w(36, 'data');
+    v.setUint32(40, ds, true);
+
+    let p = 44;
+    for (let i = 0; i < n; i++) {
+      for (let k = 0; k < c; k++) {
+        const x = Math.max(-1, Math.min(1, chs[k][i]));
+        if (bits === 16) {
+          v.setInt16(p, x < 0 ? x * 32768 : x * 32767, true);
+          p += 2;
+        } else {
+          const q = Math.round(x < 0 ? x * 8388608 : x * 8388607);
+          v.setUint8(p, q & 255);
+          v.setUint8(p + 1, (q >> 8) & 255);
+          v.setUint8(p + 2, (q >> 16) & 255);
+          p += 3;
+        }
+      }
+    }
+    return b;
+  }
+
+  $('#exp').onclick = async () => {
+    const sel2 = regions.filter(r => r.on);
+    if (!sel2.length) {
+      st('Select at least one slice to export.');
+      return;
+    }
+    if (typeof JSZip === 'undefined') {
+      st('ZIP library not loaded. Check internet connection and reload.');
+      return;
+    }
+    $('#exp').disabled = true;
+    const base = ($('#pfx').value || '').trim().replace(/[^\w-]+/g, '_') || name;
+    const bits = +$('#bits').value;
+    const norm = $('#norm').value === '1';
+    const zip = new JSZip();
+    const folder = zip.folder(base + (mode === 'loop' ? '_loops' : '_oneshots'));
+
+    try {
+      for (let i = 0; i < sel2.length; i++) {
+        st(`Rendering slice ${i + 1} of ${sel2.length}…`);
+        await new Promise(r => setTimeout(r, 0));
+        const chs = render(sel2[i]);
+        if (norm) {
+          let pk = 0;
+          chs.forEach(c => {
+            for (let j = 0; j < c.length; j++) {
+              const a = Math.abs(c[j]);
+              if (a > pk) pk = a;
+            }
+          });
+          if (pk > 0) {
+            const g = 0.891 / pk;
+            chs.forEach(c => {
+              for (let j = 0; j < c.length; j++) c[j] *= g;
+            });
+          }
+        }
+        const fn = mode === 'loop'
+          ? `${base}_loop_${Math.round(bpm)}bpm_${$('#bars').value}bar_${pad(i + 1)}.wav`
+          : `${base}_shot_${pad(i + 1)}.wav`;
+        folder.file(fn, wav(chs, bits));
+      }
+
+      const info = mode === 'loop'
+        ? `Source: ${name}\nMode: loops\nTempo: ${bpm} BPM\nLength: ${$('#bars').value} bar(s)\nCrossfade: ${$('#fade').value} ms\n`
+        : `Source: ${name}\nMode: one-shots\nSensitivity: ${$('#sens').value} dB\nMin gap: ${$('#gap').value} ms\nFade out: ${$('#fade').value} ms\n`;
+      folder.file('info.txt', info + `Slices: ${sel2.length}\nFormat: ${bits}-bit WAV, ${sr} Hz\nExported: ${new Date().toISOString()}\n`);
+
+      st('Compressing ZIP archive…');
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${base}_${mode === 'loop' ? 'loops' : 'oneshots'}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      st(`Exported ${sel2.length} slice${sel2.length > 1 ? 's' : ''} successfully.`);
+    } catch (err) {
+      st('Export failed: ' + err.message);
+    }
+    $('#exp').disabled = false;
+  };
+
+  size();
+  draw();
+})();
+</script>
+</body>
+</html>
