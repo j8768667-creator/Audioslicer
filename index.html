@@ -75,9 +75,9 @@
       box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
     }
     input[type=file]::file-selector-button {
-      min-height: 40px;
-      padding: 0 16px;
-      margin-right: 12px;
+      min-height: 38px;
+      padding: 0 14px;
+      margin-right: 10px;
       border: 0;
       border-radius: 6px;
       background: var(--ac);
@@ -105,13 +105,13 @@
       border-color: var(--ac);
     }
     button {
-      min-height: 42px;
+      min-height: 40px;
       font: inherit;
       color: var(--ink);
       background: var(--bg);
       border: 1px solid var(--ln);
       border-radius: 6px;
-      padding: 0 14px;
+      padding: 0 13px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
@@ -254,22 +254,36 @@
 <body>
 <div class="max-w-[1180px] mx-auto grid gap-3">
 
+  <!-- Restore Session Alert Banner -->
+  <div id="restoreBanner" class="pn hide flex items-center justify-between bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100 py-2.5">
+    <div class="text-xs sm:text-sm">
+      <span class="font-bold">Previous session found:</span> Saved slice markers were found for this audio. Would you like to restore them?
+    </div>
+    <div class="flex gap-2">
+      <button id="btnRestoreYes" class="pri text-xs px-3 h-8 min-h-0">Restore</button>
+      <button id="btnRestoreNo" class="text-xs px-3 h-8 min-h-0">Dismiss</button>
+    </div>
+  </div>
+
   <!-- Header & File Input / Dropzone -->
-  <div class="pn flex flex-wrap gap-4 items-center justify-between" id="dropArea">
+  <div class="pn flex flex-wrap gap-3 items-center justify-between" id="dropArea">
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+      <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
         ✂
       </div>
       <div>
-        <h1 class="text-xl font-bold tracking-tight m-0">Slicer</h1>
-        <p class="text-xs text-[var(--mu)] m-0">High-Precision Audio &amp; Video Sample Slicer</p>
+        <h1 class="text-lg sm:text-xl font-bold tracking-tight m-0">Slicer</h1>
+        <p class="text-xs text-[var(--mu)] m-0">Precision Audio &amp; Video Sample Slicer</p>
       </div>
     </div>
 
-    <div class="flex flex-1 items-center gap-3 min-w-[280px]">
-      <input id="file" type="file" accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.mp4,.mov,.webm" class="text-sm">
-      <div class="meta text-xs text-[var(--mu)] flex-1" id="meta">
-        Drop an audio or video file here, or choose file to begin.
+    <div class="flex flex-wrap flex-1 items-center gap-2 justify-end min-w-[280px]">
+      <input id="file" type="file" accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.mp4,.mov,.webm,.opus,.aiff,.aif" class="text-xs sm:text-sm flex-1 max-w-[280px]">
+      <button id="btnDemo" class="text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600">
+        🎵 Load Demo Beat
+      </button>
+      <div class="meta text-xs text-[var(--mu)] w-full text-right" id="meta">
+        Choose file, drop audio/video here, or click "Load Demo Beat"
       </div>
     </div>
   </div>
@@ -471,26 +485,63 @@
   let hist = [], ctx = null, buf = null, mono = null, sr = 44100, dur = 0;
   let E = null, D = null, O = null, peaks = null, regions = [];
   let mode = 'shot', name = 'audio', bpm = 0, sel = -1, drag = null, playing = null;
-  let W = 0, H = 0, dpr = 1;
+  let W = 0, H = 0, dpr = 1, pendingRestore = null;
 
   const st = m => { $('#st').textContent = m; };
   const pad = n => String(n).padStart(2, '0');
+
+  // Obtain or create AudioContext safely
+  function getAudioCtx() {
+    if (!ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) throw new Error('Web Audio API is not supported in this browser.');
+      ctx = new AudioCtx();
+    }
+    return ctx;
+  }
+
+  // Cross-browser Audio Decoding
+  function decodeAudioBuffer(audioCtx, arrayBuffer) {
+    return new Promise((resolve, reject) => {
+      const bufferCopy = arrayBuffer.slice(0);
+      let settled = false;
+      const onSuccess = decoded => {
+        if (!settled) { settled = true; resolve(decoded); }
+      };
+      const onError = err => {
+        if (!settled) { settled = true; reject(err || new Error('Audio decoding failed')); }
+      };
+
+      try {
+        const promise = audioCtx.decodeAudioData(bufferCopy, onSuccess, onError);
+        if (promise && typeof promise.then === 'function') {
+          promise.then(onSuccess).catch(onError);
+        }
+      } catch (err) {
+        onError(err);
+      }
+    });
+  }
 
   /* ---------- Drag & Drop and File Load ---------- */
   const dropArea = $('#dropArea');
   ['dragenter', 'dragover'].forEach(eventName => {
     window.addEventListener(eventName, e => {
       e.preventDefault();
+      e.stopPropagation();
       dropArea.classList.add('dropzone-active');
     }, false);
   });
   ['dragleave', 'drop'].forEach(eventName => {
     window.addEventListener(eventName, e => {
       e.preventDefault();
+      e.stopPropagation();
       dropArea.classList.remove('dropzone-active');
     }, false);
   });
   window.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
     const dt = e.dataTransfer;
     if (dt && dt.files && dt.files[0]) {
       loadFile(dt.files[0]);
@@ -498,26 +549,32 @@
   });
 
   $('#file').onchange = e => {
-    const f = e.target.files[0];
-    if (f) loadFile(f);
+    const f = e.target.files && e.target.files[0];
+    if (f) {
+      loadFile(f);
+      // Reset input value so re-selecting same file triggers change
+      e.target.value = '';
+    }
   };
 
   async function loadFile(f) {
     stop();
-    st('Decoding audio file…');
+    st(`Reading file "${f.name}"…`);
     try {
-      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-      if (ctx.state === 'suspended') {
-        await ctx.resume();
-      }
+      const audioCtx = getAudioCtx();
+      st('Decoding audio data…');
       const arrayBuf = await f.arrayBuffer();
-      buf = await ctx.decodeAudioData(arrayBuf);
+      const decoded = await decodeAudioBuffer(audioCtx, arrayBuf);
+      initializeLoadedAudio(decoded, f.name);
     } catch (err) {
-      st('Could not decode audio. Try standard WAV, MP3, M4A, FLAC, or MP4 formats.');
-      return;
+      console.error('Audio load error:', err);
+      st('Could not decode audio: ' + (err.message || 'File format not supported'));
     }
+  }
 
-    name = f.name.replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_') || 'audio';
+  function initializeLoadedAudio(decodedBuffer, fileName) {
+    buf = decodedBuffer;
+    name = (fileName || 'audio').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_') || 'audio';
     sr = buf.sampleRate;
     dur = buf.duration;
     bpm = 0;
@@ -531,10 +588,88 @@
 
     envelope();
     buildPeaks();
-    $('#meta').textContent = `${f.name} · ${dur.toFixed(1)} s · ${(sr / 1000).toFixed(1)} kHz · ${buf.numberOfChannels} ch`;
+    $('#meta').textContent = `${fileName} · ${dur.toFixed(1)} s · ${(sr / 1000).toFixed(1)} kHz · ${buf.numberOfChannels} ch`;
+    size();
     analyse();
-    offerRestore();
+    checkRestore();
   }
+
+  /* ---------- Built-in Demo Beat Generator ---------- */
+  $('#btnDemo').onclick = () => {
+    stop();
+    st('Generating demo beat…');
+    try {
+      const audioCtx = getAudioCtx();
+      const demoSr = audioCtx.sampleRate || 44100;
+      const demoBpm = 120;
+      const barLen = (60 / demoBpm) * 4; // 1 bar = 2.0s
+      const totalLen = barLen * 2; // 2 bars = 4.0s
+      const totalSamples = Math.floor(totalLen * demoSr);
+      const demoBuf = audioCtx.createBuffer(2, totalSamples, demoSr);
+      const L = demoBuf.getChannelData(0);
+      const R = demoBuf.getChannelData(1);
+
+      const beatSec = 60 / demoBpm;
+      const sixteenth = beatSec / 4;
+
+      // Synthesize 2 bars of punchy beat (kick, snare, hihats, sub bass)
+      for (let i = 0; i < totalSamples; i++) {
+        const t = i / demoSr;
+        const barPos = t % barLen;
+        let s = 0;
+
+        // Kick on beat 1 and 3 (0.0s and 1.0s of each bar)
+        [0, beatSec * 2].forEach(kTime => {
+          const dt = barPos - kTime;
+          if (dt >= 0 && dt < 0.3) {
+            const freq = 140 * Math.exp(-dt * 26) + 45;
+            const env = Math.exp(-dt * 12);
+            s += Math.sin(2 * Math.PI * freq * dt) * env * 0.85;
+          }
+        });
+
+        // Snare on beat 2 and 4 (0.5s and 1.5s of each bar)
+        [beatSec, beatSec * 3].forEach(sTime => {
+          const dt = barPos - sTime;
+          if (dt >= 0 && dt < 0.25) {
+            const tone = Math.sin(2 * Math.PI * 185 * dt) * Math.exp(-dt * 22) * 0.45;
+            const noise = (Math.random() * 2 - 1) * Math.exp(-dt * 16) * 0.5;
+            s += tone + noise;
+          }
+        });
+
+        // 16th Hi-Hats
+        const hatIndex = Math.floor(barPos / sixteenth);
+        const hatDt = barPos - hatIndex * sixteenth;
+        if (hatDt >= 0 && hatDt < 0.05) {
+          const accent = hatIndex % 4 === 0 ? 0.35 : (hatIndex % 2 === 0 ? 0.22 : 0.14);
+          const noise = (Math.random() * 2 - 1) * Math.exp(-hatDt * 100) * accent;
+          s += noise;
+        }
+
+        // Bass groove on offbeats
+        const bassDt = barPos - (beatSec * 0.5);
+        if (bassDt >= 0 && bassDt < 0.35) {
+          s += Math.sin(2 * Math.PI * 55 * bassDt) * Math.exp(-bassDt * 6) * 0.4;
+        }
+        const bassDt2 = barPos - (beatSec * 2.5);
+        if (bassDt2 >= 0 && bassDt2 < 0.35) {
+          s += Math.sin(2 * Math.PI * 65.4 * bassDt2) * Math.exp(-bassDt2 * 6) * 0.4;
+        }
+
+        // Soft clip
+        const out = Math.max(-0.95, Math.min(0.95, s));
+        L[i] = out;
+        R[i] = out;
+      }
+
+      initializeLoadedAudio(demoBuf, 'Demo_Beat_120bpm.wav');
+      st('Demo beat loaded! Click any slice or use Zoom editor.');
+    } catch (err) {
+      console.error('Demo generation error:', err);
+      st('Error creating demo beat: ' + err.message);
+    }
+  };
 
   /* ---------- Audio Analysis ---------- */
   function envelope() {
@@ -555,7 +690,8 @@
   }
 
   function buildPeaks() {
-    const N = 4000, per = mono.length / N;
+    const N = Math.min(4000, Math.max(200, Math.floor(mono.length / 2)));
+    const per = mono.length / N;
     peaks = new Float32Array(N * 2);
     for (let k = 0; k < N; k++) {
       let lo = 0, hi = 0;
@@ -590,6 +726,7 @@
     fresh = true;
     $('#exp').disabled = false;
     refresh();
+    st(`Analysis complete: ${regions.length} slice${regions.length === 1 ? '' : 's'} found.`);
   }
 
   function shots() {
@@ -708,8 +845,8 @@
   function size() {
     const c = $('#cv');
     dpr = window.devicePixelRatio || 1;
-    W = c.clientWidth;
-    H = c.clientHeight;
+    W = c.clientWidth || (c.parentElement ? c.parentElement.clientWidth - 16 : 800) || 800;
+    H = c.clientHeight || 190;
     c.width = W * dpr;
     c.height = H * dpr;
   }
@@ -721,11 +858,11 @@
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
 
-    if (!buf) {
+    if (!buf || !peaks) {
       g.fillStyle = cs.getPropertyValue('--mu');
       g.font = '500 14px sans-serif';
       g.textAlign = 'center';
-      g.fillText('Drop an audio file or click "Choose File" above to load waveform', W / 2, H / 2);
+      g.fillText('Drop an audio file, choose file, or click "Load Demo Beat" above', W / 2, H / 2);
       return;
     }
 
@@ -891,10 +1028,13 @@
   function play(r) {
     if (!buf) return;
     stop();
-    if (ctx.state !== 'running') ctx.resume();
-    const s = ctx.createBufferSource();
+    const audioCtx = getAudioCtx();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    const s = audioCtx.createBufferSource();
     s.buffer = buf;
-    s.connect(ctx.destination);
+    s.connect(audioCtx.destination);
     if (mode === 'loop') {
       s.loop = true;
       s.loopStart = r.s;
@@ -912,7 +1052,7 @@
       }
     };
     playing = s;
-    ph = { t0: ctx.currentTime, r, loop: mode === 'loop' };
+    ph = { t0: audioCtx.currentTime, r, loop: mode === 'loop' };
     startTick();
   }
 
@@ -925,7 +1065,7 @@
   }
 
   function setMode(m) {
-    if (m === mode || !guard()) return;
+    if (m === mode) return;
     mode = m;
     uiMode();
     if (m === 'loop' && $('#fade').value === '0') $('#fade').value = '10';
@@ -942,37 +1082,39 @@
     const el = $('#' + id);
     ap[id] = el.value;
     el.onchange = () => {
-      if (!guard()) {
-        el.value = ap[id];
-        el.dispatchEvent(new Event('input'));
-        return;
-      }
       ap[id] = el.value;
       analyse();
     };
   });
 
-  $('#det').onclick = () => { if (guard()) analyse(true); };
+  $('#det').onclick = () => { analyse(true); };
   $('#bpm').onchange = e => {
     const v = parseFloat(e.target.value);
     if (v >= 40 && v <= 240) {
-      if (!guard()) {
-        e.target.value = bpm.toFixed(1);
-        return;
-      }
       bpm = v;
       analyse();
     }
   };
 
   const setBpm = v => {
-    if (!buf || !bpm || !guard()) return;
+    if (!buf || !bpm) return;
     bpm = Math.round(Math.max(40, Math.min(240, v)) * 10) / 10;
     $('#bpm').value = bpm.toFixed(1);
     analyse();
   };
   $('#half').onclick = () => setBpm(bpm / 2);
   $('#dbl').onclick = () => setBpm(bpm * 2);
+
+  const ro = new ResizeObserver(() => {
+    size();
+    draw();
+    if (edOpen) {
+      sizeEd();
+      drawEd();
+    }
+  });
+  const cvw = $('#cvw');
+  if (cvw) ro.observe(cvw);
 
   window.addEventListener('resize', () => {
     size();
@@ -984,7 +1126,6 @@
   });
 
   /* ---------- Playhead & Markers ---------- */
-  const guard = () => !hist.length || confirm('Re-analysing discards your manual edits. Continue?');
   const phPos = () => {
     if (!ph || !ctx) return null;
     const L = Math.max(0.001, ph.r.e - ph.r.s), el = ctx.currentTime - ph.t0;
@@ -1076,7 +1217,7 @@
     openEd(regions.indexOf(n));
   };
 
-  /* ---------- Persistence & History ---------- */
+  /* ---------- Persistence & Restore Banner ---------- */
   const skey = () => `slicer:${name}:${buf.length}:${sr}`;
   function save() {
     if (!buf) return;
@@ -1085,14 +1226,32 @@
     } catch (e) {}
   }
 
-  function offerRestore() {
+  function checkRestore() {
     try {
       const d = JSON.parse(localStorage.getItem(skey()) || 'null');
-      if (d && d.regions && d.regions.length && confirm('Saved slice markers were found for this file. Restore them?')) {
-        restore(d);
+      if (d && d.regions && d.regions.length) {
+        pendingRestore = d;
+        $('#restoreBanner').classList.remove('hide');
+      } else {
+        $('#restoreBanner').classList.add('hide');
       }
-    } catch (e) {}
+    } catch (e) {
+      $('#restoreBanner').classList.add('hide');
+    }
   }
+
+  $('#btnRestoreYes').onclick = () => {
+    if (pendingRestore) {
+      restore(pendingRestore);
+      pendingRestore = null;
+    }
+    $('#restoreBanner').classList.add('hide');
+  };
+
+  $('#btnRestoreNo').onclick = () => {
+    pendingRestore = null;
+    $('#restoreBanner').classList.add('hide');
+  };
 
   function restore(d) {
     stop();
@@ -1104,13 +1263,14 @@
     sel = -1;
     cur = null;
     closeEd();
-    $('#bars').value = d.bars;
-    ap.bars = d.bars;
+    $('#bars').value = d.bars || 4;
+    ap.bars = d.bars || 4;
     $('#bpm').value = bpm ? bpm.toFixed(1) : '';
     uiMode();
     size();
     $('#exp').disabled = false;
     refresh();
+    st(`Restored ${regions.length} saved slice markers.`);
   }
 
   function pushHist() {
@@ -1160,16 +1320,17 @@
     const r = regions[sel];
     if (!r || !buf) return;
     stop();
-    if (ctx.state !== 'running') ctx.resume();
+    const audioCtx = getAudioCtx();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
     const chs = render(r);
-    const b = ctx.createBuffer(chs.length, chs[0].length, sr);
+    const b = audioCtx.createBuffer(chs.length, chs[0].length, sr);
     chs.forEach((c, i) => b.copyToChannel(c, i));
-    const s = ctx.createBufferSource();
+    const s = audioCtx.createBufferSource();
     s.buffer = b;
     s.loop = true;
-    s.connect(ctx.destination);
+    s.connect(audioCtx.destination);
     s.start();
-    s.stop(ctx.currentTime + b.duration * 4);
+    s.stop(audioCtx.currentTime + b.duration * 4);
     s.onended = () => {
       if (playing === s) {
         playing = null;
@@ -1179,7 +1340,7 @@
       }
     };
     playing = s;
-    ph = { t0: ctx.currentTime, r, loop: true };
+    ph = { t0: audioCtx.currentTime, r, loop: true };
     startTick();
     st('Auditioning loop 4 times with export crossfade applied.');
   };
@@ -1189,8 +1350,8 @@
   const ptr = new Map(), ev = $('#ev');
 
   function sizeEd() {
-    W2 = ev.clientWidth;
-    H2 = ev.clientHeight;
+    W2 = ev.clientWidth || 800;
+    H2 = ev.clientHeight || 240;
     ev.width = W2 * dpr;
     ev.height = H2 * dpr;
   }
