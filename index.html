@@ -269,7 +269,16 @@
     .hide { display: none !important; }
   </style>
 </head>
-<body>
+<body class="relative">
+  <!-- Full Window Drop Overlay -->
+  <div id="dropOverlay" class="fixed inset-0 z-50 bg-blue-600/90 text-white flex flex-col items-center justify-center gap-3 backdrop-blur-sm pointer-events-none transition-opacity duration-150 opacity-0">
+    <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-3xl font-bold animate-pulse">
+      📥
+    </div>
+    <div class="text-xl sm:text-2xl font-bold tracking-tight">Drop Audio or Video File Here</div>
+    <div class="text-xs sm:text-sm text-blue-100">Instant browser-local decoding · WAV, MP3, FLAC, M4A, AAC, OGG, AIFF</div>
+  </div>
+
 <div class="max-w-[1240px] mx-auto grid gap-3">
 
   <!-- Restore Session Alert Banner -->
@@ -385,6 +394,15 @@
     </div>
 
     <div class="grid gap-1">
+      <label for="midiMapMode" class="text-xs font-semibold text-[var(--mu)] whitespace-nowrap">MIDI Mapping</label>
+      <select id="midiMapMode" title="Choose how slice notes are mapped in the exported MIDI file">
+        <option value="gm" selected>General MIDI Drums (Kick=36, Snare=38, Hat=42)</option>
+        <option value="chromatic">Chromatic Scale (C1, C#1, D1... Sampler Pads)</option>
+        <option value="root">Single Root Key (C1 · 36 for All Hits)</option>
+      </select>
+    </div>
+
+    <div class="grid gap-1">
       <label for="bits" class="text-xs font-semibold text-[var(--mu)] whitespace-nowrap">Bit Depth</label>
       <select id="bits">
         <option value="16">16-bit WAV (Standard)</option>
@@ -430,9 +448,11 @@
   <!-- Zoom Slice Editor Panel (Collapsible) -->
   <div class="pn hide transition-all duration-200" id="ed">
     <div class="flex flex-wrap gap-2 items-center justify-between pb-2 border-b border-[var(--ln)]">
-      <div class="flex items-center gap-2 min-w-0">
+      <div class="flex items-center gap-2 min-w-0 flex-wrap">
         <span id="edT" class="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold text-xs sm:text-sm whitespace-nowrap">Slice 01</span>
+        <input id="edName" type="text" class="h-7 px-2 text-xs font-semibold rounded bg-white dark:bg-black/30 border border-[var(--ln)] text-[var(--ink)] w-28 sm:w-36 focus:outline-none focus:border-blue-500" placeholder="Slice Name" title="Custom slice label (used in WAV, SFZ, and SF2 exports)">
         <span id="edTagBadge" class="tag-pill tag-sample cursor-pointer" title="Click to change classification">Sample</span>
+        <span id="edMidiBadge" class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 whitespace-nowrap" title="Chromatic MIDI Trigger &amp; Root Key">C1 (36)</span>
         <span class="text-xs text-[var(--mu)] font-mono tabular-nums truncate" id="edR"></span>
       </div>
       <div class="flex flex-wrap gap-1.5 items-center">
@@ -617,48 +637,139 @@
     });
   }
 
-  // Cross-browser Audio Decoding
-  function decodeAudioBuffer(audioCtx, arrayBuffer) {
-    return new Promise((resolve, reject) => {
-      const bufferCopy = arrayBuffer.slice(0);
-      let settled = false;
-      const onSuccess = decoded => {
-        if (!settled) { settled = true; resolve(decoded); }
-      };
-      const onError = err => {
-        if (!settled) { settled = true; reject(err || new Error('Audio decoding failed')); }
-      };
-
-      try {
-        const promise = audioCtx.decodeAudioData(bufferCopy, onSuccess, onError);
-        if (promise && typeof promise.then === 'function') {
-          promise.then(onSuccess).catch(onError);
-        }
-      } catch (err) {
-        onError(err);
+  // Pure JS WAV fallback decoder for unhandled chunks (bext, smpl, cue, 24-bit, 32-bit float)
+  function decodeWavFallback(arrayBuffer, audioCtx) {
+    try {
+      const view = new DataView(arrayBuffer);
+      if (view.byteLength < 44) return null;
+      if (view.getUint32(0, false) !== 0x52494646 || view.getUint32(8, false) !== 0x57415645) {
+        return null;
       }
-    });
+      let offset = 12;
+      let fmt = null;
+      let dataOffset = 0;
+      let dataSize = 0;
+
+      while (offset + 8 <= view.byteLength) {
+        const chunkId = String.fromCharCode(
+          view.getUint8(offset),
+          view.getUint8(offset + 1),
+          view.getUint8(offset + 2),
+          view.getUint8(offset + 3)
+        );
+        const chunkSize = view.getUint32(offset + 4, true);
+        if (chunkId === 'fmt ') {
+          const audioFormat = view.getUint16(offset + 8, true);
+          const numChannels = view.getUint16(offset + 10, true);
+          const sampleRate = view.getUint32(offset + 12, true);
+          const bitsPerSample = view.getUint16(offset + 22, true);
+          fmt = { audioFormat, numChannels, sampleRate, bitsPerSample };
+        } else if (chunkId === 'data') {
+          dataOffset = offset + 8;
+          dataSize = Math.min(chunkSize, view.byteLength - dataOffset);
+          break;
+        }
+        offset += 8 + chunkSize + (chunkSize % 2);
+      }
+
+      if (!fmt || !dataOffset || !dataSize) return null;
+      const bytesPerSample = Math.max(1, Math.floor(fmt.bitsPerSample / 8));
+      const totalSamples = Math.floor(dataSize / (fmt.numChannels * bytesPerSample));
+      if (totalSamples <= 0) return null;
+
+      const audioBuffer = audioCtx.createBuffer(fmt.numChannels, totalSamples, fmt.sampleRate);
+      const channels = [];
+      for (let c = 0; c < fmt.numChannels; c++) channels.push(audioBuffer.getChannelData(c));
+
+      let pos = dataOffset;
+      for (let i = 0; i < totalSamples; i++) {
+        for (let c = 0; c < fmt.numChannels; c++) {
+          let sampleVal = 0;
+          if (fmt.bitsPerSample === 16) {
+            sampleVal = view.getInt16(pos, true) / 32768;
+            pos += 2;
+          } else if (fmt.bitsPerSample === 24) {
+            const b0 = view.getUint8(pos);
+            const b1 = view.getUint8(pos + 1);
+            const b2 = view.getInt8(pos + 2);
+            sampleVal = (b0 | (b1 << 8) | (b2 << 16)) / 8388608;
+            pos += 3;
+          } else if (fmt.bitsPerSample === 32) {
+            if (fmt.audioFormat === 3) {
+              sampleVal = view.getFloat32(pos, true);
+            } else {
+              sampleVal = view.getInt32(pos, true) / 2147483648;
+            }
+            pos += 4;
+          } else if (fmt.bitsPerSample === 8) {
+            sampleVal = (view.getUint8(pos) - 128) / 128;
+            pos += 1;
+          }
+          channels[c][i] = sampleVal;
+        }
+      }
+      return audioBuffer;
+    } catch (e) {
+      console.warn('WAV fallback decoder error:', e);
+      return null;
+    }
   }
 
-  /* ---------- Drag & Drop and File Load ---------- */
-  const dropArea = $('#dropArea');
-  ['dragenter', 'dragover'].forEach(eventName => {
-    window.addEventListener(eventName, e => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropArea.classList.add('dropzone-active');
-    }, false);
+  // Cross-browser Audio Decoding with WAV Fallback
+  async function decodeAudioBuffer(audioCtx, arrayBuffer) {
+    try {
+      const bufferCopy = arrayBuffer.slice(0);
+      const decoded = await new Promise((resolve, reject) => {
+        let settled = false;
+        const onSuccess = d => { if (!settled) { settled = true; resolve(d); } };
+        const onError = e => { if (!settled) { settled = true; reject(e); } };
+        try {
+          const res = audioCtx.decodeAudioData(bufferCopy, onSuccess, onError);
+          if (res && typeof res.then === 'function') {
+            res.then(onSuccess).catch(onError);
+          }
+        } catch (err) {
+          onError(err);
+        }
+      });
+      return decoded;
+    } catch (nativeErr) {
+      console.warn('Native decodeAudioData failed, checking WAV fallback parser…', nativeErr);
+      const wavFallback = decodeWavFallback(arrayBuffer, audioCtx);
+      if (wavFallback) {
+        return wavFallback;
+      }
+      throw nativeErr || new Error('Unsupported audio format or corrupted media stream.');
+    }
+  }
+
+  /* ---------- Full Window Drag & Drop and File Load ---------- */
+  const dropOverlay = $('#dropOverlay');
+  let dragCounter = 0;
+
+  window.addEventListener('dragenter', e => {
+    e.preventDefault();
+    dragCounter++;
+    if (dropOverlay) dropOverlay.classList.remove('opacity-0');
   });
-  ['dragleave', 'drop'].forEach(eventName => {
-    window.addEventListener(eventName, e => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropArea.classList.remove('dropzone-active');
-    }, false);
+
+  window.addEventListener('dragover', e => {
+    e.preventDefault();
   });
+
+  window.addEventListener('dragleave', e => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      if (dropOverlay) dropOverlay.classList.add('opacity-0');
+    }
+  });
+
   window.addEventListener('drop', e => {
     e.preventDefault();
-    e.stopPropagation();
+    dragCounter = 0;
+    if (dropOverlay) dropOverlay.classList.add('opacity-0');
     const dt = e.dataTransfer;
     if (dt && dt.files && dt.files[0]) {
       loadFile(dt.files[0]);
@@ -876,6 +987,9 @@
       }
     }
     if (s >= 0) push(s, n - 1);
+    if (!out.length && dur > 0.01) {
+      out.push({ s: 0, e: dur, on: true });
+    }
     return out;
   }
 
@@ -1250,19 +1364,29 @@
   cv.addEventListener('pointercancel', endDrag);
 
   /* ---------- Slices List & Direct DAW Drag-Out ---------- */
+  function midiNoteName(midiNum) {
+    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const oct = Math.floor(midiNum / 12) - 1;
+    return `${notes[midiNum % 12]}${oct}`;
+  }
+
   function list() {
     $('#list').innerHTML = regions.length ? regions.map((r, i) => {
       const tagClass = `tag-${r.tag || 'sample'}`;
       const tagLabel = (r.tag || 'sample').toUpperCase();
+      const midiKey = getSliceMidiNote(r, i);
+      const midiName = midiNoteName(midiKey);
+      const displayName = r.name || `${mode === 'loop' ? 'Loop' : 'Shot'} ${pad(i + 1)}`;
       const soundModifiers = (r.rev ? '⇄ ' : '') + (r.gain ? `${r.gain > 0 ? '+' : ''}${r.gain}dB ` : '') + (r.pitch ? `${r.pitch > 0 ? '+' : ''}${r.pitch}st` : '');
 
       return `
       <div class="row${r.on ? ' on' : ''}${i === sel ? ' sel' : ''} group" draggable="true" data-drag-idx="${i}" title="Drag slice out directly to desktop or DAW">
         <button class="chk shrink-0" data-t="${i}" aria-label="Toggle inclusion of slice ${i + 1}" title="Toggle export inclusion">${r.on ? '✓' : ''}</button>
-        <button class="nm flex-1 text-left px-2.5 py-1.5 min-w-0 truncate hover:text-[var(--ac)] transition-colors" data-p="${i}" title="Open Zoom Editor">
+        <button class="nm flex-1 text-left px-2.5 py-1.5 min-w-0 truncate hover:text-[var(--ac)] transition-colors" data-p="${i}" title="Open Zoom Editor & Rename">
           <div class="flex items-center gap-1.5 truncate">
-            <span class="font-medium text-xs text-[var(--ink)] truncate">${mode === 'loop' ? 'Loop' : 'Shot'} ${pad(i + 1)}</span>
+            <span class="font-medium text-xs text-[var(--ink)] truncate">${displayName}</span>
             <span class="tag-pill ${tagClass}">${tagLabel}</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 whitespace-nowrap" title="Mapped to MIDI Note ${midiKey} (${midiName})">${midiName} · ${midiKey}</span>
             ${soundModifiers ? `<span class="text-[10px] text-blue-500 font-mono">${soundModifiers}</span>` : ''}
           </div>
           <div class="text-[11px] text-[var(--mu)] font-mono tabular-nums truncate">${(r.e - r.s).toFixed(2)}s · ${rmsDb(r).toFixed(0)}dB</div>
@@ -1288,7 +1412,8 @@
         if (norm) normalizeAudio(chs);
         const wavData = wav(chs, bits);
         const base = ($('#pfx').value || '').trim().replace(/[^\w-]+/g, '_') || name;
-        const fn = mode === 'loop' ? `${base}_loop_${pad(idx + 1)}.wav` : `${base}_${r.tag || 'shot'}_${pad(idx + 1)}.wav`;
+        const sliceNameSafe = (r.name || (mode === 'loop' ? `loop_${pad(idx + 1)}` : `${r.tag || 'shot'}_${pad(idx + 1)}`)).replace(/[^\w-]+/g, '_');
+        const fn = `${base}_${sliceNameSafe}.wav`;
         const blob = new Blob([wavData], { type: 'audio/wav' });
         const blobUrl = URL.createObjectURL(blob);
         e.dataTransfer.setData('DownloadURL', `audio/wav:${fn}:${blobUrl}`);
@@ -1754,6 +1879,10 @@
       $('#edPitchV').textContent = `${(r.pitch || 0) > 0 ? '+' : ''}${r.pitch || 0} st`;
       $('#edRev').textContent = '⇄ Reverse: ' + (r.rev ? 'On' : 'Off');
       $('#edRev').classList.toggle('act', !!r.rev);
+      $('#edName').value = r.name || '';
+      const midiKey = getSliceMidiNote(r, sel);
+      $('#edMidiBadge').textContent = `${midiNoteName(midiKey)} (${midiKey})`;
+      $('#edMidiBadge').title = `MIDI Trigger & Root Note: ${midiNoteName(midiKey)} (MIDI #${midiKey})`;
       updateTagBadge(r.tag);
     }
     sizeEd();
@@ -1761,6 +1890,17 @@
     list();
     draw();
   }
+
+  $('#midiMapMode').onchange = () => {
+    refresh();
+  };
+
+  $('#edName').oninput = e => {
+    if (sel < 0 || !regions[sel]) return;
+    regions[sel].name = e.target.value;
+    list();
+  };
+  $('#edName').onchange = () => { pushHist(); };
 
   function updateTagBadge(tag) {
     const b = $('#edTagBadge');
@@ -2235,7 +2375,29 @@
     }
   };
 
-  /* ---------- Correct Chronological MIDI File (.mid) Generator ---------- */
+  /* ---------- Intelligent MIDI Note Mapper ---------- */
+  function getSliceMidiNote(r, idx) {
+    if (r && r.midiNote !== undefined) return r.midiNote;
+    const mode = $('#midiMapMode') ? $('#midiMapMode').value : 'gm';
+    if (mode === 'root') {
+      return 36; // C1
+    }
+    if (mode === 'chromatic') {
+      return 36 + (idx % 60);
+    }
+    // General MIDI Drum standard mapping:
+    const tag = (r && r.tag) || 'sample';
+    if (tag === 'kick') return 36;     // Bass Drum 1 (C1)
+    if (tag === 'snare') return 38;    // Acoustic Snare (D1)
+    if (tag === 'hihat') {
+      const dur = r ? r.e - r.s : 0.1;
+      return dur > 0.22 ? 46 : 42;     // 42 = Closed Hi-Hat (F#1), 46 = Open Hi-Hat (A#1)
+    }
+    if (tag === 'perc') return 39;     // Hand Clap (D#1)
+    return 37;                         // Side Stick (C#1)
+  }
+
+  /* ---------- Chronological MIDI File (.mid) Generator ---------- */
   function writeVarLen(val) {
     let buffer = val & 0x7F;
     const bytes = [];
@@ -2275,7 +2437,8 @@
     const sorted = [...sliceRegions].sort((a, b) => a.s - b.s);
 
     sorted.forEach((r, idx) => {
-      const noteNum = 36 + (idx % 48); // Start at C1 (36)
+      const origIdx = sliceRegions.indexOf(r);
+      const noteNum = getSliceMidiNote(r, origIdx >= 0 ? origIdx : idx);
       const startTick = Math.max(0, Math.round((r.s / secPerBeat) * ticksPerQuarter));
       const durSec = Math.max(0.04, r.e - r.s);
       const durTicks = Math.max(60, Math.round((durSec / secPerBeat) * ticksPerQuarter));
@@ -2325,11 +2488,15 @@
   }
 
   /* ---------- SFZ Generator (Mighty Synth iOS Compatible) ---------- */
-  function generateSfz(sliceFiles) {
+  function generateSfz(sliceFiles, sliceRegions = []) {
     let sfz = `// Slicer SFZ Instrument Map\n// Compatible with iOS Mighty Synth, Sforzando, bs-16i, AudioKit\n<control>\ndefault_path=\n\n<global>\nloop_mode=one_shot\nampeg_attack=0.001\nampeg_decay=0.001\nampeg_sustain=100\nampeg_release=0.2\n\n<group>\n\n`;
     sliceFiles.forEach((file, idx) => {
-      const key = 36 + (idx % 60);
-      sfz += `<region> sample=${file} lokey=${key} hikey=${key} pitch_keycenter=${key}\n`;
+      const r = sliceRegions[idx];
+      const key = getSliceMidiNote(r, idx);
+      const rootKey = (r && r.rootKey !== undefined) ? r.rootKey : key;
+      const pitchOffset = (r && r.pitch) ? r.pitch : 0;
+      const tuneCents = Math.round(pitchOffset * 100);
+      sfz += `<region> sample=${file} lokey=${key} hikey=${key} pitch_keycenter=${rootKey}${tuneCents ? ` tune=${tuneCents}` : ''}\n`;
     });
     return sfz;
   }
@@ -2344,7 +2511,7 @@
     return xml;
   }
 
-  /* ---------- SoundFont 2 (.sf2) Binary Generator ---------- */
+  /* ---------- Robust SoundFont 2 (.sf2) Binary Generator ---------- */
   function writeAscii(view, offset, str, maxLen) {
     for (let i = 0; i < maxLen; i++) {
       view.setUint8(offset + i, i < str.length ? str.charCodeAt(i) : 0);
@@ -2399,64 +2566,79 @@
     ]);
 
     const PADDING_SAMPLES = 46;
-    let totalSmplWords = 0;
+    let totalSmplWords = PADDING_SAMPLES;
     for (const s of samplesList) {
-      totalSmplWords += s.data.length + PADDING_SAMPLES;
+      const sLen = Math.max(64, s.data.length);
+      totalSmplWords += sLen + PADDING_SAMPLES;
     }
     const smplData = new Int16Array(totalSmplWords);
     const sampleHeaders = [];
-    let currentOffset = 0;
+    let currentOffset = PADDING_SAMPLES;
 
     for (let i = 0; i < samplesList.length; i++) {
       const s = samplesList[i];
-      const sLen = s.data.length;
+      const sLen = Math.max(64, s.data.length);
       smplData.set(s.data, currentOffset);
       const start = currentOffset;
       const end = currentOffset + sLen;
+      // Conform strictly to SF2 specification (end - endLoop >= 8, endLoop - startLoop >= 8, startLoop >= start)
+      const startLoop = end - 16;
+      const endLoop = end - 8;
+      const key = s.key || (36 + (i % 60));
+      const rootKey = s.rootKey !== undefined ? s.rootKey : key;
+      const fineTune = Math.max(-128, Math.min(127, Math.round((s.pitch || 0) * 100)));
+
       sampleHeaders.push({
         name: (s.name || `slice_${i + 1}`).slice(0, 19),
         start,
         end,
-        startLoop: start,
-        endLoop: end,
+        startLoop,
+        endLoop,
         sampleRate: s.sampleRate || sampleRate,
-        originalKey: s.key || (36 + (i % 60)),
-        pitchCorrection: 0
+        originalKey: rootKey,
+        pitchCorrection: fineTune
       });
-      currentOffset += sLen + PADDING_SAMPLES;
+      currentOffset = end + PADDING_SAMPLES;
     }
 
     const sdtaList = makeSf2List('sdta', [
       makeSf2Chunk('smpl', smplData.buffer)
     ]);
 
+    // phdr: 2 records (Preset 0 + EOP)
     const phdr = new Uint8Array(38 * 2);
     const phdrView = new DataView(phdr.buffer);
     writeAscii(phdrView, 0, (bankName || 'Slicer').slice(0, 19), 20);
-    phdrView.setUint16(20, 0, true);
-    phdrView.setUint16(22, 0, true);
-    phdrView.setUint16(24, 0, true);
+    phdrView.setUint16(20, 0, true); // wPreset = 0
+    phdrView.setUint16(22, 0, true); // wBank = 0
+    phdrView.setUint16(24, 0, true); // wPresetBagNdx = 0
     writeAscii(phdrView, 38, 'EOP', 20);
     phdrView.setUint16(38 + 20, 0, true);
     phdrView.setUint16(38 + 22, 0, true);
-    phdrView.setUint16(38 + 24, 1, true);
+    phdrView.setUint16(38 + 24, 1, true); // 1 preset bag
 
+    // pbag: 2 records (Bag 0 + terminal)
     const pbag = new Uint8Array(4 * 2);
     const pbagView = new DataView(pbag.buffer);
     pbagView.setUint16(0, 0, true);
     pbagView.setUint16(2, 0, true);
-    pbagView.setUint16(4, 1, true);
+    pbagView.setUint16(4, 2, true); // 2 pgens
     pbagView.setUint16(6, 0, true);
 
     const pmod = new Uint8Array(10);
 
-    const pgen = new Uint8Array(4 * 2);
+    // pgen: keyRange (43) [0, 127], instrument (41) [0], terminal (0, 0)
+    const pgen = new Uint8Array(4 * 3);
     const pgenView = new DataView(pgen.buffer);
-    pgenView.setUint16(0, 41, true); // instrument generator
-    pgenView.setUint16(2, 0, true);  // Instrument 0
-    pgenView.setUint16(4, 0, true);
-    pgenView.setUint16(6, 0, true);
+    pgenView.setUint16(0, 43, true); // keyRange
+    pgenView.setUint8(2, 0);         // lo = 0
+    pgenView.setUint8(3, 127);       // hi = 127
+    pgenView.setUint16(4, 41, true); // instrument
+    pgenView.setUint16(6, 0, true);  // Instrument 0
+    pgenView.setUint16(8, 0, true);  // terminal gen
+    pgenView.setUint16(10, 0, true);
 
+    // inst: 2 records (Instrument 0 + EOI)
     const inst = new Uint8Array(22 * 2);
     const instView = new DataView(inst.buffer);
     writeAscii(instView, 0, 'Kit', 20);
@@ -2464,10 +2646,11 @@
     writeAscii(instView, 22, 'EOI', 20);
     instView.setUint16(22 + 20, samplesList.length, true);
 
+    // ibag
     const numSamples = samplesList.length;
+    const GENS_PER_SAMPLE = 5;
     const ibag = new Uint8Array(4 * (numSamples + 1));
     const ibagView = new DataView(ibag.buffer);
-    const GENS_PER_SAMPLE = 3;
     for (let i = 0; i < numSamples; i++) {
       ibagView.setUint16(i * 4, i * GENS_PER_SAMPLE, true);
       ibagView.setUint16(i * 4 + 2, 0, true);
@@ -2477,21 +2660,35 @@
 
     const imod = new Uint8Array(10);
 
+    // igen: keyRange (43), fineTune (52), sampleModes (54), overridingRootKey (58), sampleID (53)
     const totalIgens = numSamples * GENS_PER_SAMPLE + 1;
     const igen = new Uint8Array(4 * totalIgens);
     const igenView = new DataView(igen.buffer);
     for (let i = 0; i < numSamples; i++) {
       const key = samplesList[i].key || (36 + (i % 60));
+      const rootKey = samplesList[i].rootKey !== undefined ? samplesList[i].rootKey : key;
+      const fineTune = Math.max(-128, Math.min(127, Math.round((samplesList[i].pitch || 0) * 100)));
       const baseOff = (i * GENS_PER_SAMPLE) * 4;
-      igenView.setUint16(baseOff, 43, true); // keyRange
+      // 1. keyRange (43)
+      igenView.setUint16(baseOff, 43, true);
       igenView.setUint8(baseOff + 2, key);
       igenView.setUint8(baseOff + 3, key);
-      igenView.setUint16(baseOff + 4, 58, true); // overridingRootKey
-      igenView.setUint16(baseOff + 6, key, true);
-      igenView.setUint16(baseOff + 8, 53, true); // sampleID
-      igenView.setUint16(baseOff + 10, i, true);
+      // 2. fineTune (52)
+      igenView.setUint16(baseOff + 4, 52, true);
+      igenView.setInt16(baseOff + 6, fineTune, true);
+      // 3. sampleModes (54) -> 0 = non-looping one-shot
+      igenView.setUint16(baseOff + 8, 54, true);
+      igenView.setUint16(baseOff + 10, 0, true);
+      // 4. overridingRootKey (58)
+      igenView.setUint16(baseOff + 12, 58, true);
+      igenView.setUint16(baseOff + 14, rootKey, true);
+      // 5. sampleID (53) -> MUST BE LAST GENERATOR IN INSTRUMENT ZONE
+      igenView.setUint16(baseOff + 16, 53, true);
+      igenView.setUint16(baseOff + 18, i, true);
     }
+    // Terminal igen is already zeros
 
+    // shdr
     const shdr = new Uint8Array(46 * (numSamples + 1));
     const shdrView = new DataView(shdr.buffer);
     for (let i = 0; i < numSamples; i++) {
@@ -2551,12 +2748,15 @@
         const s = Math.max(-1, Math.min(1, monoData[i]));
         int16Data[i] = s < 0 ? s * 32768 : s * 32767;
       }
-      const key = 36 + (idx % 60);
-      const tag = r.tag || 'slice';
+      const key = getSliceMidiNote(r, idx);
+      const rootKey = (r && r.rootKey !== undefined) ? r.rootKey : key;
+      const customName = (r.name || `${r.tag || 'slice'}_${pad(idx + 1)}`).replace(/[^\w-]+/g, '_');
       list.push({
-        name: `${tag}_${pad(idx + 1)}`,
+        name: customName,
         data: int16Data,
         key: key,
+        rootKey: rootKey,
+        pitch: r.pitch || 0,
         sampleRate: sr
       });
     });
@@ -2586,10 +2786,11 @@
     const sel2 = regions.filter(r => r.on);
     if (!sel2.length) { st('Select at least one slice to export.'); return; }
     const base = ($('#pfx').value || '').trim().replace(/[^\w-]+/g, '_') || name;
-    const sliceFileNames = sel2.map((r, i) =>
-      mode === 'loop' ? `${base}_loop_${Math.round(bpm)}bpm_${$('#bars').value}bar_${pad(i + 1)}.wav` : `${base}_${r.tag || 'shot'}_${pad(i + 1)}.wav`
-    );
-    const sfzText = generateSfz(sliceFileNames);
+    const sliceFileNames = sel2.map((r, i) => {
+      const sliceNameSafe = (r.name || (mode === 'loop' ? `loop_${pad(i + 1)}` : `${r.tag || 'shot'}_${pad(i + 1)}`)).replace(/[^\w-]+/g, '_');
+      return mode === 'loop' ? `${base}_loop_${Math.round(bpm)}bpm_${$('#bars').value}bar_${pad(i + 1)}.wav` : `${base}_${sliceNameSafe}.wav`;
+    });
+    const sfzText = generateSfz(sliceFileNames, sel2);
     const blob = new Blob([sfzText], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -2598,7 +2799,7 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-    st(`Downloaded ${base}_kit.sfz (Mighty Synth compatible)`);
+    st(`Downloaded ${base}_kit.sfz (Mighty Synth compatible with tuning)`);
   };
 
   $('#btnDlMidi').onclick = () => {
@@ -2644,9 +2845,10 @@
         const chs = render(sel2[i]);
         if (norm) normalizeAudio(chs);
 
+        const sliceNameSafe = (sel2[i].name || (mode === 'loop' ? `loop_${pad(i + 1)}` : `${sel2[i].tag || 'shot'}_${pad(i + 1)}`)).replace(/[^\w-]+/g, '_');
         const fn = mode === 'loop'
           ? `${base}_loop_${Math.round(bpm)}bpm_${$('#bars').value}bar_${pad(i + 1)}.wav`
-          : `${base}_${sel2[i].tag || 'shot'}_${pad(i + 1)}.wav`;
+          : `${base}_${sliceNameSafe}.wav`;
 
         folder.file(fn, wav(chs, bits));
         sliceFileNames.push(fn);
@@ -2662,7 +2864,7 @@
       // Include SFZ and DecentSampler Instruments if checked
       if ($('#chkSfz').checked) {
         st('Building sampler presets (SFZ & DecentSampler)…');
-        folder.file(`${base}_kit.sfz`, generateSfz(sliceFileNames));
+        folder.file(`${base}_kit.sfz`, generateSfz(sliceFileNames, sel2));
         folder.file(`${base}_preset.dspreset`, generateDecentSamplerPreset(base, sliceFileNames));
       }
 

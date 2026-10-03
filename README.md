@@ -1,48 +1,71 @@
 # Slicer ✂️
 
-A high-precision, self-contained, browser-based audio and video sample slicer and sampler kit builder. Automatically detect transients for one-shot drum hits, classify drum sounds (Kick, Snare, Hi-Hat, Perc), or detect tempo (BPM) and bar grid boundaries for seamless looping samples. Export your slices directly as 16-bit or 24-bit broadcast-grade WAV files, standard MIDI maps (`.mid`), and complete sampler presets (`.sfz` and DecentSampler `.dspreset`) inside a compressed ZIP archive.
+A high-precision, self-contained, browser-based audio and video sample slicer and professional sampler kit builder. Automatically detect transients for one-shot drum hits, classify drum sounds (Kick, Snare, Hi-Hat, Perc), or detect tempo (BPM) and bar grid boundaries for seamless looping samples. Export your slices directly as 16-bit or 24-bit broadcast-grade WAV files, standalone SoundFont 2 banks (`.sf2`), open instrument maps (`.sfz`), standard Type-0 MIDI trigger maps (`.mid`), and complete DecentSampler presets (`.dspreset`) inside a single compressed ZIP archive.
 
 Works 100% locally in your browser using the HTML5 Web Audio API, Canvas 2D, and JSZip. Zero server uploads, zero latency, zero telemetry.
 
 ---
 
-## ✨ Features
+## ✨ Features & Implemented Functionality
 
-### 🎧 Dual Slicing Engines
-- **One-Shot Mode**: RMS onset & transient energy detection with configurable sensitivity (dB) and minimum hit gap (ms).
+### 🎹 Complete Sampler Kit & Preset Engine
+- **SFZ Export (`.sfz`)**: Universal open-format instrument mapping with chromatic key mapping starting at C1 (MIDI 36), per-slice root keys (`pitch_keycenter`), per-slice fine tuning in cents (`tune`), and `loop_mode=one_shot`. 100% compatible with iOS Mighty Synth, Sforzando, bs-16i, LinuxSampler, and AudioKit.
+- **Native SoundFont 2 Export (`.sf2`)**: Generates a standard SoundFont 2.04 RIFF `sfbk` binary file containing embedded 16-bit PCM audio slices, instrument zones, preset zones, chromatic key ranges, overriding root keys, and fine tuning. Ready for 1-tap import on iOS and hardware soundfont players.
+- **Type-0 MIDI Sequence (`.mid`)**: Generates chronological Type-0 MIDI file with track name, tempo meta-events (BPM synchronized), variable-length quantity delta times, and chromatic slice triggers to recreate the exact groove in any DAW.
+- **WAV Export**: Selectable 16-bit and 24-bit PCM audio rendering with optional peak normalization (0 dBFS).
+- **All-in-One Portable ZIP Kit**: Bundles all sliced WAV files + `.sfz` + `.sf2` + `.mid` + DecentSampler `.dspreset` + session log (`info.txt`) into a single archive.
+- **Standalone Download Action Buttons**: Direct 1-click download buttons for `⭳ SF2`, `⭳ SFZ`, `⭳ MIDI`, and `Export ZIP`.
+
+### 🎛️ Per-Slice Controls
+- **Custom Renaming**: Rename any slice inline via the zoom editor (e.g. "Punchy Kick", "Snare Reverb"). Custom names are reflected on slice cards and dynamically used for WAV filenames, SFZ regions, and SF2 sample descriptors.
+- **Chromatic Note Badge**: Every slice displays its mapped chromatic MIDI note and number (e.g., `C1 · 36`, `C#1 · 37`, `D1 · 38`).
+- **Pitch Transposition**: Semi-tone coarse tuning (±12 semitones) with real-time playback audition, sinc-interpolated resampling on WAV render, and fine-tune metadata in SFZ and SF2.
+- **Gain Trim**: Adjust individual slice level by ±12 dB.
+- **⇄ Reverse**: Non-destructive reverse playback and reversed WAV export.
+- **Auditioning**: 1-click playback audition button on every slice card and in the zoom editor.
+- **Delete & Download**: Dedicated single slice delete and individual WAV download buttons.
+
+### 🎧 Dual Slicing Engines (Automatic + Manual)
+- **Automatic Transient Detection (One-Shots)**: RMS onset energy envelope with real-time sensitivity threshold (dB) and minimum hit gap (ms).
 - **Dynamic Threshold Guide**: Real-time visual overlay on the waveform demonstrating exact transient trigger boundaries.
-- **Loop Mode**: Automatic tempo (BPM) detection using onset autocorrelation with parabolic sub-sample peak interpolation. Quantizes to 1, 2, 4, or 8-bar boundaries with beat-grid snapping.
-- **Click & Drag Region Creation**: Draw custom slices directly on empty canvas areas with automatic zero-crossing snapping.
+- **Guaranteed One-Shot Fallback**: Single hits, vocal stabs, or ambient tones with subtle transients automatically provision a slice spanning the sound so no audio file ever loads empty.
+- **Automatic Loop Quantization**: Tempo (BPM) detection using onset autocorrelation with parabolic sub-sample peak interpolation. Quantizes to 1, 2, 4, or 8-bar boundaries with beat-grid snapping.
+- **Manual Slice Creation**:
+  - **+ Add Slice**: Instant slice placement at current playhead/marker position.
+  - **Click & Drag Region Creation**: Draw custom slices directly on empty canvas areas with automatic zero-crossing snapping.
+  - **Split & Merge**: Split existing slices at markers or merge with adjacent slices.
 
 ### 🔬 Intelligent Transient Classification
-- Automatically classifies one-shot slices into **Kick**, **Snare**, **Hi-Hat**, **Perc**, or **Sample/FX** using spectral centroid, high-frequency energy ratio, and zero-crossing rate analysis.
-- Color-coded tag pills on every slice card.
-- Automatic descriptive naming on export (e.g. `Song_kick_01.wav`, `Song_snare_02.wav`).
+- Heuristically classifies slices into **Kick**, **Snare**, **Hi-Hat**, **Perc**, or **Sample/FX** using spectral centroid, high-frequency energy ratio, and zero-crossing rate analysis.
+- Color-coded tag pills on every slice card with interactive 1-click override.
 
 ### 📊 Waveform & Spectrogram Views
-- **Waveform Overview**: Full-track visualization with draggable slice boundaries, active playhead tracking, and manual marker placement.
-- **Interactive Fourier Spectrogram**: Switch seamlessly between time-domain waveform and multi-color Short-Time Fourier Transform (STFT) frequency heatmap.
+- **Full Waveform Overview**: Interactive waveform with draggable boundary handles and playhead tracking.
+- **Fast STFT Spectrogram**: Real-time Short-Time Fourier Transform frequency heatmap optimized to render in under 8 ms using pre-computed trigonometric tables.
 - **Zoom Slice Editor**: High-resolution zoom view with pinch-to-zoom, mouse wheel zoom, pan, and interactive boundary handles.
 - **Zero-Crossing Snapping**: Auto-aligns slice start and end points to zero-amplitude crossings within a ±2 ms window to eliminate clicks and pops.
 - **Micro-Nudge Controls**: Precision ±1 ms and ±10 ms adjustment buttons for surgical editing.
 
-### 🎛️ Per-Slice Sound Shaping
-- **⇄ Reverse**: Non-destructive reverse playback and reversed WAV export.
-- **Gain Trim**: Adjust individual slice level by ±12 dB.
-- **Pitch Transposition**: Semi-tone coarse tuning (±12 semitones) with real-time audition and sinc-interpolated resampling on export.
-- **Editor Loop Audition**: Toggle looped playback directly within the zoom editor to fine-tune slice boundaries.
+### 🛡️ Resilient Local Audio Engine
+- **100% Client-Side**: Audio never leaves your computer or browser.
+- **Native WAV Fallback Decoder (`decodeWavFallback`)**: Parses Broadcast Wave Format (`bext`), sampler metadata (`smpl`), cue chunks, and 24/32-bit PCM directly in JavaScript if browser Web Audio decoding fails.
+- **Full-Window Drag & Drop**: Drag audio files anywhere onto the window with visual overlay confirmation.
 
-### 🔄 Advanced Crossfading & Seam Auditioning
-- **Equal-Power (3 dB) Crossfade**: Sine/cosine power-preserving crossfade curve prevents volume dips at loop seams.
-- **Linear Crossfade**: Traditional linear crossfading (0 to 100 ms).
-- **Seam ×4 Auditioning**: Seamlessly audition loop transitions with 4 repetitions before exporting.
+---
 
-### 🎹 Sampler Kit & MIDI Export
-- **Standard MIDI Map (`.mid`)**: Automatically generates a Type 0 MIDI file with chromatic trigger notes (C1, C#1, D1, etc.) mapped to the exact slice timing to rebuild the groove in any DAW.
-- **SFZ Sampler Patch (`.sfz`)**: Universal open-format instrument mapping for Sforzando, LinuxSampler, and hardware samplers.
-- **DecentSampler Preset (`.dspreset`)**: Ready-to-play multi-sample preset for DecentSampler (free VST/AU/AAX/iOS).
-- **Direct Drag-Out**: Drag slice cards directly out of the browser into compatible DAWs (Ableton, Bitwig, Reaper) or desktop folders.
-- **1-Click Individual WAV Download**: Download any slice instantly with applied gain, pitch, reverse, and normalization.
+## 📱 iOS Mighty Synth Import Guide
+
+### Method A: Standalone SoundFont 2 (Fastest)
+1. Tap **⭳ SF2** in Slicer to download `YourTrack.sf2`.
+2. In the iOS Safari downloads menu, tap the file and choose **Share** → **Save to Files**.
+3. Choose **On My iPhone/iPad** → **Mighty Synth** (or tap **Open in Mighty Synth** directly).
+4. In Mighty Synth, select the SoundFont bank from the preset selector. Your slices are chromatic starting at C1 (MIDI 36).
+
+### Method B: Full ZIP Kit
+1. Tap **Export ZIP** and download the archive.
+2. In iOS **Files**, tap the `.zip` file to extract the folder.
+3. Move the uncompressed folder into **On My iPhone/iPad** → **Mighty Synth**.
+4. In Mighty Synth, load the `.sfz` file. All accompanying WAV slices in the folder load instantly with proper pitch centers and tuning.
 
 ---
 
@@ -53,67 +76,16 @@ Because `index.html` is completely self-contained with Tailwind CSS and JSZip lo
 - Simply double-click `index.html` or open it in Chrome, Safari, Firefox, or Edge.
 
 ### 2. Run with Node / Vite
-If you prefer running via the included Vite dev server:
 ```bash
-# Install dependencies
 npm install
-
-# Start local server
 npm run dev
 ```
 
 ---
 
-## 📦 How to Publish to GitHub
-
-### Option A: Using Git Command Line
-
-1. **Initialize Git (if not already done)**:
-   ```bash
-   git init -b main
-   git add .
-   git commit -m "feat: complete audio slicer and sampler workstation"
-   ```
-
-2. **Create a new repository on GitHub**:
-   - Go to [github.com/new](https://github.com/new).
-   - Name your repository (e.g. `slicer` or `audio-slicer`).
-   - Do **not** initialize with a README (this repository already has one).
-
-3. **Link remote and push**:
-   ```bash
-   git remote add origin https://github.com/<YOUR-USERNAME>/<YOUR-REPO-NAME>.git
-   git branch -M main
-   git push -u origin main
-   ```
-
-### Option B: Using GitHub CLI (`gh`)
-
-If you have `gh` installed and authenticated on your machine:
-```bash
-gh repo create slicer --public --source=. --remote=origin --push
-```
-
----
-
-## 🌐 Deploy to GitHub Pages (1-Click Free Hosting)
-
-Once pushed to GitHub, you can host Slicer for free via GitHub Pages:
-
-1. Open your repository on GitHub.
-2. Go to **Settings** > **Pages** (under "Code and automation").
-3. Under **Build and deployment**:
-   - **Source**: `Deploy from a branch`
-   - **Branch**: `main`
-   - **Folder**: `/ (root)`
-4. Click **Save**.
-5. Within 1 minute, your app will be live at `https://<YOUR-USERNAME>.github.io/<YOUR-REPO-NAME>/`.
-
----
-
 ## 🎹 Supported Audio & Video Formats
 
-Any format supported by your browser's Web Audio API decoding engine:
+Any format supported by your browser's media engine:
 - `.wav`, `.mp3`, `.m4a`, `.aac`, `.flac`, `.ogg`, `.opus`, `.aiff`
 - Video audio tracks: `.mp4`, `.mov`, `.webm`
 
