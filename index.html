@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Slicer - Audio One-Shot &amp; Loop Slicer</title>
-  <meta name="description" content="Browser-based audio and video sample slicer with transient detection, automatic BPM loop slicing, waveform editor, and ZIP WAV export.">
+  <meta name="description" content="Professional browser-based audio sample slicer with transient classification, interactive spectrogram, BPM loop slicing, sound shaping, MIDI, and sampler export.">
   <meta property="og:title" content="Slicer - Audio One-Shot &amp; Loop Slicer">
-  <meta property="og:description" content="Browser-based audio and video sample slicer with transient detection, automatic BPM loop slicing, waveform editor, and ZIP WAV export.">
+  <meta property="og:description" content="Professional browser-based audio sample slicer with transient classification, interactive spectrogram, BPM loop slicing, sound shaping, MIDI, and sampler export.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
 
@@ -30,7 +30,7 @@
     };
   </script>
 
-  <!-- JSZip for in-browser WAV packaging -->
+  <!-- JSZip for in-browser WAV and Sampler packaging -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <style>
@@ -85,38 +85,40 @@
       font-weight: 600;
       cursor: pointer;
       transition: background 0.15s ease;
+      white-space: nowrap;
     }
     input[type=file]::file-selector-button:hover {
       filter: brightness(1.1);
     }
     select, input[type=number], input[type=text] {
-      min-height: 42px;
-      font: inherit;
-      color: var(--ink);
-      background: var(--bg);
-      border: 1px solid var(--ln);
-      border-radius: 6px;
-      padding: 0 12px;
-      width: 100%;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    select:focus, input[type=number]:focus, input[type=text]:focus {
-      border-color: var(--ac);
-    }
-    button {
       min-height: 40px;
       font: inherit;
       color: var(--ink);
       background: var(--bg);
       border: 1px solid var(--ln);
       border-radius: 6px;
-      padding: 0 13px;
+      padding: 0 10px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+      font-size: 13px;
+    }
+    select:focus, input[type=number]:focus, input[type=text]:focus {
+      border-color: var(--ac);
+    }
+    button {
+      min-height: 38px;
+      font: inherit;
+      color: var(--ink);
+      background: var(--bg);
+      border: 1px solid var(--ln);
+      border-radius: 6px;
+      padding: 0 12px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 5px;
       font-weight: 500;
       transition: all 0.15s ease;
     }
@@ -143,6 +145,8 @@
     .seg button {
       flex: 1;
       border-radius: 0;
+      min-height: 40px;
+      font-size: 13px;
     }
     .seg button:first-child {
       border-radius: 6px 0 0 6px;
@@ -172,9 +176,9 @@
     }
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 22px;
-      height: 22px;
-      margin-top: -8.5px;
+      width: 20px;
+      height: 20px;
+      margin-top: -7.5px;
       border-radius: 50%;
       background: var(--pn);
       border: 2.5px solid var(--ac);
@@ -186,8 +190,8 @@
       border-radius: 3px;
     }
     input[type=range]::-moz-range-thumb {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
       background: var(--pn);
       border: 2.5px solid var(--ac);
@@ -213,6 +217,7 @@
     }
     .row {
       display: flex;
+      align-items: center;
       border: 1px solid var(--ln);
       border-radius: 6px;
       overflow: hidden;
@@ -230,10 +235,10 @@
       border: 0;
       border-radius: 0;
       background: transparent;
-      min-height: 44px;
+      min-height: 42px;
     }
     .chk {
-      width: 44px;
+      width: 40px;
       border-right: 1px solid var(--ln) !important;
       font-weight: 700;
       color: var(--ac);
@@ -241,58 +246,68 @@
     .row:not(.on) .nm {
       color: var(--mu);
     }
-    .nm {
-      flex: 1;
-      text-align: left;
-      font-variant-numeric: tabular-nums;
-      padding-left: 10px;
-      font-size: 14px;
+    .tag-pill {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .tag-kick { background: rgba(168, 85, 247, 0.15); color: #9333ea; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .tag-snare { background: rgba(249, 115, 22, 0.15); color: #ea580c; border: 1px solid rgba(249, 115, 22, 0.3); }
+    .tag-hihat { background: rgba(14, 165, 233, 0.15); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.3); }
+    .tag-perc { background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .tag-sample { background: rgba(100, 116, 139, 0.15); color: #475569; border: 1px solid rgba(100, 116, 139, 0.3); }
+    @media (prefers-color-scheme: dark) {
+      .tag-kick { color: #c084fc; }
+      .tag-snare { color: #fb923c; }
+      .tag-hihat { color: #38bdf8; }
+      .tag-perc { color: #34d399; }
+      .tag-sample { color: #94a3b8; }
     }
     .hide { display: none !important; }
   </style>
 </head>
 <body>
-<div class="max-w-[1180px] mx-auto grid gap-3">
+<div class="max-w-[1240px] mx-auto grid gap-3">
 
   <!-- Restore Session Alert Banner -->
-  <div id="restoreBanner" class="pn hide flex items-center justify-between bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100 py-2.5">
-    <div class="text-xs sm:text-sm">
-      <span class="font-bold">Previous session found:</span> Saved slice markers were found for this audio. Would you like to restore them?
+  <div id="restoreBanner" class="pn hide flex items-center justify-between gap-3 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100 py-2.5">
+    <div class="text-xs sm:text-sm truncate">
+      <span class="font-bold">Session found:</span> Saved slice markers found for this file. Restore?
     </div>
-    <div class="flex gap-2">
+    <div class="flex gap-2 shrink-0">
       <button id="btnRestoreYes" class="pri text-xs px-3 h-8 min-h-0">Restore</button>
       <button id="btnRestoreNo" class="text-xs px-3 h-8 min-h-0">Dismiss</button>
     </div>
   </div>
 
   <!-- Header & File Input / Dropzone -->
-  <div class="pn flex flex-wrap gap-3 items-center justify-between" id="dropArea">
+  <div class="pn flex flex-wrap gap-4 items-center justify-between" id="dropArea">
     <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+      <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shrink-0">
         ✂
       </div>
       <div>
         <h1 class="text-lg sm:text-xl font-bold tracking-tight m-0">Slicer</h1>
-        <p class="text-xs text-[var(--mu)] m-0">Precision Audio &amp; Video Sample Slicer</p>
+        <p class="text-xs text-[var(--mu)] m-0 whitespace-nowrap">High-Precision Audio &amp; Video Sample Slicer</p>
       </div>
     </div>
 
-    <div class="flex flex-wrap flex-1 items-center gap-2 justify-end min-w-[280px]">
-      <input id="file" type="file" accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.mp4,.mov,.webm,.opus,.aiff,.aif" class="text-xs sm:text-sm flex-1 max-w-[280px]">
-      <button id="btnDemo" class="text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600">
-        🎵 Load Demo Beat
-      </button>
-      <div class="meta text-xs text-[var(--mu)] w-full text-right" id="meta">
-        Choose file, drop audio/video here, or click "Load Demo Beat"
+    <div class="flex flex-wrap flex-1 items-center gap-3 justify-end min-w-[280px]">
+      <input id="file" type="file" accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.mp4,.mov,.webm,.opus,.aiff,.aif,*/*" class="text-xs sm:text-sm flex-1 max-w-[340px]">
+      <div class="meta text-xs text-[var(--mu)] text-right truncate max-w-full" id="meta" title="Choose an audio or video file, or drag &amp; drop here to begin.">
+        Choose an audio or video file, or drag &amp; drop here to begin.
       </div>
     </div>
   </div>
 
   <!-- Slicer Configuration Panel -->
-  <div class="pn grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-x-5 gap-y-3 items-end" id="ctl">
+  <div class="pn grid grid-cols-[repeat(auto-fit,minmax(270px,1fr))] gap-x-5 gap-y-3.5 items-end" id="ctl">
     <!-- Mode Selection -->
     <div class="grid gap-1">
-      <span class="text-xs font-medium text-[var(--mu)] flex justify-between">Mode</span>
+      <span class="text-xs font-semibold text-[var(--mu)] flex items-center justify-between whitespace-nowrap">Mode</span>
       <div class="seg">
         <button id="mShot" class="act">One-shots</button>
         <button id="mLoop">Loops</button>
@@ -301,22 +316,24 @@
 
     <!-- One-shot controls -->
     <div class="grid gap-1 shot">
-      <label for="sens" class="text-xs font-medium text-[var(--mu)] flex justify-between">
-        Sensitivity <b id="sensV" class="text-[var(--ink)] font-semibold">40 dB</b>
+      <label for="sens" class="text-xs font-semibold text-[var(--mu)] flex items-center justify-between gap-1 whitespace-nowrap">
+        <span>Transient Sensitivity</span>
+        <b id="sensV" class="text-[var(--ink)] font-mono text-xs">40 dB</b>
       </label>
-      <input id="sens" type="range" min="20" max="70" value="40">
+      <input id="sens" type="range" min="15" max="70" value="40">
     </div>
 
     <div class="grid gap-1 shot">
-      <label for="gap" class="text-xs font-medium text-[var(--mu)] flex justify-between">
-        Min gap between hits <b id="gapV" class="text-[var(--ink)] font-semibold">120 ms</b>
+      <label for="gap" class="text-xs font-semibold text-[var(--mu)] flex items-center justify-between gap-1 whitespace-nowrap">
+        <span>Min Hit Gap</span>
+        <b id="gapV" class="text-[var(--ink)] font-mono text-xs">120 ms</b>
       </label>
       <input id="gap" type="range" min="20" max="500" step="10" value="120">
     </div>
 
     <!-- Loop controls -->
     <div class="grid gap-1 loop hide">
-      <label for="bars" class="text-xs font-medium text-[var(--mu)]">Loop length</label>
+      <label for="bars" class="text-xs font-semibold text-[var(--mu)] whitespace-nowrap">Loop Length</label>
       <select id="bars">
         <option value="1">1 bar</option>
         <option value="2">2 bars</option>
@@ -326,41 +343,49 @@
     </div>
 
     <div class="grid gap-1 loop hide">
-      <label for="bpm" class="text-xs font-medium text-[var(--mu)]">Tempo (BPM)</label>
-      <div class="flex gap-2">
-        <input id="bpm" type="number" min="40" max="240" step="0.1" inputmode="decimal" class="flex-1">
-        <button id="half" title="Half tempo" class="px-2">÷2</button>
-        <button id="dbl" title="Double tempo" class="px-2">×2</button>
-        <button id="det" title="Re-detect BPM">Detect</button>
+      <label for="bpm" class="text-xs font-semibold text-[var(--mu)] whitespace-nowrap">Tempo (BPM)</label>
+      <div class="flex items-center gap-1.5 w-full">
+        <input id="bpm" type="number" min="40" max="240" step="0.1" inputmode="decimal" class="flex-1 min-w-[70px]">
+        <button id="half" title="Halve tempo" class="px-2.5 text-xs font-semibold shrink-0">÷2</button>
+        <button id="dbl" title="Double tempo" class="px-2.5 text-xs font-semibold shrink-0">×2</button>
+        <button id="det" title="Re-detect BPM" class="px-3 text-xs font-semibold shrink-0">Detect</button>
       </div>
     </div>
 
     <div class="grid gap-1 loop hide">
-      <label for="gsn" class="text-xs font-medium text-[var(--mu)]">Grid snap while dragging</label>
+      <label for="gsn" class="text-xs font-semibold text-[var(--mu)] whitespace-nowrap">Grid Snap</label>
       <select id="gsn">
-        <option value="0">Off</option>
-        <option value="4">Bar</option>
-        <option value="1" selected>Beat</option>
-        <option value=".5">½ beat</option>
-        <option value=".25">¼ beat</option>
+        <option value="0">Off (Free Drag)</option>
+        <option value="4">1 Bar (4 beats)</option>
+        <option value="1" selected>1 Beat (Quarter)</option>
+        <option value=".5">½ Beat (8th note)</option>
+        <option value=".25">¼ Beat (16th note)</option>
       </select>
     </div>
 
-    <!-- Export & Audio Settings -->
+    <!-- Crossfade curve & length -->
     <div class="grid gap-1">
-      <label for="fade" class="text-xs font-medium text-[var(--mu)]">Fade / crossfade</label>
-      <select id="fade">
-        <option value="0">None</option>
-        <option value="5">5 ms</option>
-        <option value="10" selected>10 ms</option>
-        <option value="20">20 ms</option>
-        <option value="50">50 ms</option>
-        <option value="100">100 ms</option>
-      </select>
+      <label for="fade" class="text-xs font-semibold text-[var(--mu)] whitespace-nowrap">Fade / Crossfade</label>
+      <div class="flex gap-1.5">
+        <select id="fade" class="flex-1">
+          <option value="0">0 ms (Off)</option>
+          <option value="5">5 ms</option>
+          <option value="10" selected>10 ms (Default)</option>
+          <option value="20">20 ms</option>
+          <option value="50">50 ms</option>
+          <option value="100">100 ms</option>
+          <option value="250">250 ms (Smooth)</option>
+          <option value="500">500 ms (Long Ambient)</option>
+        </select>
+        <select id="fadeCurve" class="w-32 shrink-0" title="Crossfade curve type">
+          <option value="linear">Linear</option>
+          <option value="equal_power" selected>Equal Power</option>
+        </select>
+      </div>
     </div>
 
     <div class="grid gap-1">
-      <label for="bits" class="text-xs font-medium text-[var(--mu)]">Bit depth</label>
+      <label for="bits" class="text-xs font-semibold text-[var(--mu)] whitespace-nowrap">Bit Depth</label>
       <select id="bits">
         <option value="16">16-bit WAV (Standard)</option>
         <option value="24">24-bit WAV (Studio Pro)</option>
@@ -368,27 +393,36 @@
     </div>
 
     <div class="grid gap-1">
-      <label for="norm" class="text-xs font-medium text-[var(--mu)]">Level normalization</label>
+      <label for="norm" class="text-xs font-semibold text-[var(--mu)] whitespace-nowrap">Level Normalization</label>
       <select id="norm">
-        <option value="1">Normalise to −1 dBFS</option>
-        <option value="0">Keep original level</option>
+        <option value="1">−1 dBFS Peak Normalization</option>
+        <option value="0">Keep Original Level</option>
       </select>
     </div>
 
     <div class="grid gap-1">
-      <label for="pfx" class="text-xs font-medium text-[var(--mu)]">File name prefix</label>
+      <label for="pfx" class="text-xs font-semibold text-[var(--mu)] whitespace-nowrap">File Name Prefix</label>
       <input id="pfx" type="text" placeholder="Defaults to file name" autocapitalize="off" autocorrect="off">
     </div>
   </div>
 
-  <!-- Main Waveform Overview Panel -->
+  <!-- Main Waveform & Spectrogram Overview Panel -->
   <div class="pn p-2" id="cvw">
-    <div class="flex items-center justify-between px-2 py-1 text-xs text-[var(--mu)]">
-      <span>Waveform Overview (Click slice to zoom &amp; edit · Drag boundaries to adjust)</span>
-      <span class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center justify-between px-2 py-1.5 gap-2 text-xs text-[var(--mu)] border-b border-[var(--ln)] mb-1">
+      <div class="flex items-center gap-3">
+        <span class="font-medium text-[var(--ink)]">Visual View:</span>
+        <div class="inline-flex rounded-md border border-[var(--ln)] overflow-hidden">
+          <button id="btnViewWave" class="h-7 px-2.5 text-xs font-semibold act bg-[var(--ac)] text-white">Waveform</button>
+          <button id="btnViewSpec" class="h-7 px-2.5 text-xs font-semibold bg-[var(--bg)] text-[var(--ink)]">Spectrogram</button>
+        </div>
+        <span class="text-[11px] text-[var(--mu)] hidden sm:inline">Click+Drag empty space to draw slice · Drag boundaries to adjust</span>
+      </div>
+
+      <div class="flex items-center gap-3 whitespace-nowrap text-xs">
         <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"></span> Active Slice</span>
         <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-orange-500 inline-block"></span> Marker</span>
-      </span>
+        <span class="inline-flex items-center gap-1 shot"><span class="w-2 h-0.5 border-t border-dashed border-red-500 inline-block"></span> Threshold</span>
+      </div>
     </div>
     <canvas id="cv"></canvas>
   </div>
@@ -396,18 +430,20 @@
   <!-- Zoom Slice Editor Panel (Collapsible) -->
   <div class="pn hide transition-all duration-200" id="ed">
     <div class="flex flex-wrap gap-2 items-center justify-between pb-2 border-b border-[var(--ln)]">
-      <div class="flex items-center gap-2">
-        <b id="edT" class="text-base font-bold text-[var(--ink)]">Slice</b>
-        <span class="text-xs text-[var(--mu)] font-mono tabular-nums" id="edR"></span>
+      <div class="flex items-center gap-2 min-w-0">
+        <span id="edT" class="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold text-xs sm:text-sm whitespace-nowrap">Slice 01</span>
+        <span id="edTagBadge" class="tag-pill tag-sample cursor-pointer" title="Click to change classification">Sample</span>
+        <span class="text-xs text-[var(--mu)] font-mono tabular-nums truncate" id="edR"></span>
       </div>
       <div class="flex flex-wrap gap-1.5 items-center">
-        <button id="zo" title="Zoom out">Zoom −</button>
-        <button id="zi" title="Zoom in">Zoom +</button>
-        <button id="zf" title="Fit slice to view">Fit</button>
-        <button id="rst" title="Reset slice boundaries">Reset slice</button>
-        <button id="seam" class="loop hide bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 font-semibold" title="Audition loop seam 4 times">Seam ×4</button>
-        <button id="edP" class="pri">▶ Play</button>
-        <button id="edC" class="px-3" title="Close editor">✕ Close</button>
+        <button id="zo" class="h-8 px-2 text-xs" title="Zoom out">Zoom −</button>
+        <button id="zi" class="h-8 px-2 text-xs" title="Zoom in">Zoom +</button>
+        <button id="zf" class="h-8 px-2.5 text-xs" title="Fit slice to view">Fit View</button>
+        <button id="rst" class="h-8 px-2.5 text-xs" title="Reset slice boundaries">Reset</button>
+        <button id="seam" class="loop hide h-8 px-2.5 text-xs font-semibold bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400" title="Audition loop seam 4 times">Seam ×4</button>
+        <button id="edLoopToggle" class="h-8 px-2.5 text-xs font-semibold" title="Toggle loop playback in editor">Loop: Off</button>
+        <button id="edP" class="pri h-8 px-3 text-xs font-semibold">▶ Play</button>
+        <button id="edC" class="h-8 px-2.5 text-xs" title="Close editor">✕ Close</button>
       </div>
     </div>
 
@@ -415,64 +451,123 @@
       <canvas id="ev"></canvas>
     </div>
 
+    <!-- Per-Slice Sound Shaping (Gain, Pitch Shift, Reverse) -->
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-3 pt-2.5 pb-2 border-t border-[var(--ln)] bg-black/[0.02] dark:bg-white/[0.02] px-2 rounded-md">
+      <div class="flex items-center gap-3">
+        <button id="edRev" class="h-8 px-3 text-xs font-semibold whitespace-nowrap" title="Reverse this slice playback & export">
+          ⇄ Reverse: Off
+        </button>
+      </div>
+
+      <div class="grid gap-0.5">
+        <div class="flex justify-between text-xs font-semibold text-[var(--mu)]">
+          <span>Slice Gain Trim</span>
+          <b id="edGainV" class="font-mono text-[var(--ink)]">0.0 dB</b>
+        </div>
+        <input id="edGain" type="range" min="-12" max="12" step="0.5" value="0">
+      </div>
+
+      <div class="grid gap-0.5">
+        <div class="flex justify-between text-xs font-semibold text-[var(--mu)]">
+          <span>Pitch Transpose</span>
+          <b id="edPitchV" class="font-mono text-[var(--ink)]">0 st</b>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="edPitchDn" class="h-7 px-2 text-xs font-mono">−1</button>
+          <input id="edPitch" type="range" min="-12" max="12" step="1" value="0" class="flex-1">
+          <button id="edPitchUp" class="h-7 px-2 text-xs font-mono">+1</button>
+          <button id="edPitchRst" class="h-7 px-2 text-[11px]" title="Reset Pitch">0</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Fine Nudge Controls -->
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3 pt-2 border-t border-[var(--ln)]">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(270px,1fr))] gap-3 pt-2.5 border-t border-[var(--ln)]">
       <div class="grid gap-1">
-        <span class="text-xs text-[var(--mu)] font-medium">Start point micro-nudge</span>
+        <span class="text-xs text-[var(--mu)] font-semibold whitespace-nowrap">Start Point Micro-Nudge</span>
         <div class="flex gap-1 nud" data-k="s">
-          <button data-d="-0.01" class="flex-1 text-xs">−10 ms</button>
-          <button data-d="-0.001" class="flex-1 text-xs">−1 ms</button>
-          <button data-d="0.001" class="flex-1 text-xs">+1 ms</button>
-          <button data-d="0.01" class="flex-1 text-xs">+10 ms</button>
+          <button data-d="-0.01" class="flex-1 h-8 text-xs font-mono px-1 whitespace-nowrap min-w-0">−10ms</button>
+          <button data-d="-0.001" class="flex-1 h-8 text-xs font-mono px-1 whitespace-nowrap min-w-0">−1ms</button>
+          <button data-d="0.001" class="flex-1 h-8 text-xs font-mono px-1 whitespace-nowrap min-w-0">+1ms</button>
+          <button data-d="0.01" class="flex-1 h-8 text-xs font-mono px-1 whitespace-nowrap min-w-0">+10ms</button>
         </div>
       </div>
       <div class="grid gap-1">
-        <span class="text-xs text-[var(--mu)] font-medium">End point micro-nudge</span>
+        <span class="text-xs text-[var(--mu)] font-semibold whitespace-nowrap">End Point Micro-Nudge</span>
         <div class="flex gap-1 nud" data-k="e">
-          <button data-d="-0.01" class="flex-1 text-xs">−10 ms</button>
-          <button data-d="-0.001" class="flex-1 text-xs">−1 ms</button>
-          <button data-d="0.001" class="flex-1 text-xs">+1 ms</button>
-          <button data-d="0.01" class="flex-1 text-xs">+10 ms</button>
+          <button data-d="-0.01" class="flex-1 h-8 text-xs font-mono px-1 whitespace-nowrap min-w-0">−10ms</button>
+          <button data-d="-0.001" class="flex-1 h-8 text-xs font-mono px-1 whitespace-nowrap min-w-0">−1ms</button>
+          <button data-d="0.001" class="flex-1 h-8 text-xs font-mono px-1 whitespace-nowrap min-w-0">+1ms</button>
+          <button data-d="0.01" class="flex-1 h-8 text-xs font-mono px-1 whitespace-nowrap min-w-0">+10ms</button>
         </div>
       </div>
     </div>
 
     <!-- Additional Editor Actions -->
-    <div class="flex flex-wrap gap-2 items-center justify-between pt-3 mt-2 border-t border-[var(--ln)]">
-      <div class="flex flex-wrap gap-2">
-        <button id="snap" class="act text-xs font-semibold">Snap to zero crossing: On</button>
-        <button id="spl" class="text-xs">Split at marker</button>
-        <button id="mrg" class="text-xs">Merge with next</button>
-        <button id="del" class="text-xs text-red-500 border-red-300 dark:border-red-900/50">Delete slice</button>
+    <div class="flex flex-wrap gap-2 items-center justify-between pt-2.5 mt-2 border-t border-[var(--ln)]">
+      <div class="flex flex-wrap gap-1.5 items-center">
+        <button id="snap" class="act h-8 px-2.5 text-xs font-medium whitespace-nowrap">Zero-Snap: On</button>
+        <button id="spl" class="h-8 px-2.5 text-xs whitespace-nowrap">Split at Marker</button>
+        <button id="mrg" class="h-8 px-2.5 text-xs whitespace-nowrap">Merge with Next</button>
+        <button id="del" class="h-8 px-2.5 text-xs whitespace-nowrap text-red-500 border-red-300 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/20">Delete Slice</button>
+        <button id="edDl" class="h-8 px-2.5 text-xs whitespace-nowrap" title="Download this slice directly">⭳ Download Slice</button>
       </div>
-      <div class="text-xs text-[var(--mu)]">
-        Pinch to zoom · Drag handles to trim · Drag waveform to pan · Tap waveform to place marker
+      <div class="text-xs text-[var(--mu)] truncate">
+        Drag handles to trim · Drag waveform to pan · Tap to set marker · Pinch/wheel to zoom
       </div>
     </div>
   </div>
 
-  <!-- Global Action Bar -->
+  <!-- Global Action Bar & Sampler Package Options -->
   <div class="pn">
-    <div class="flex flex-wrap gap-2 items-center justify-between">
-      <div class="flex flex-wrap gap-2 items-center">
-        <button id="undo" disabled title="Undo last edit (Ctrl/Cmd+Z)">↺ Undo</button>
-        <button id="add" title="Place slice at current marker location">+ Add slice at marker</button>
-        <button id="all">Select all</button>
-        <button id="none">Select none</button>
+    <div class="flex flex-wrap gap-3 items-center justify-between">
+      <div class="flex flex-wrap gap-1.5 items-center">
+        <button id="undo" class="h-9 px-3 text-xs" disabled title="Undo last edit (Ctrl/Cmd+Z)">↺ Undo</button>
+        <button id="add" class="h-9 px-3 text-xs" title="Place slice at current marker location">+ Add Slice</button>
+        <button id="all" class="h-9 px-3 text-xs">Select All</button>
+        <button id="none" class="h-9 px-3 text-xs">Select None</button>
       </div>
 
-      <div class="text-sm font-medium text-[var(--mu)]" id="cnt">No slices</div>
+      <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2 text-xs text-[var(--mu)]">
+          <label class="inline-flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" id="chkMidi" checked class="rounded text-blue-600">
+            <span>MIDI</span>
+          </label>
+          <label class="inline-flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" id="chkSfz" checked class="rounded text-blue-600">
+            <span>SFZ (Mighty Synth)</span>
+          </label>
+          <label class="inline-flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" id="chkSf2" checked class="rounded text-blue-600">
+            <span>SF2 (SoundFont)</span>
+          </label>
+        </div>
 
-      <button id="exp" class="pri px-6" disabled>
-        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-        Export ZIP
-      </button>
+        <div class="text-xs sm:text-sm font-medium text-[var(--mu)] whitespace-nowrap" id="cnt">No slices</div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button id="btnDlSf2" class="h-9 px-2.5 text-xs font-semibold whitespace-nowrap" title="Download standalone SoundFont 2 (.sf2) file for iOS Mighty Synth and samplers">
+            ⭳ SF2
+          </button>
+          <button id="btnDlSfz" class="h-9 px-2.5 text-xs font-semibold whitespace-nowrap" title="Download SFZ mapping file for Mighty Synth">
+            ⭳ SFZ
+          </button>
+          <button id="btnDlMidi" class="h-9 px-2.5 text-xs font-semibold whitespace-nowrap" title="Download MIDI slicing groove file">
+            ⭳ MIDI
+          </button>
+          <button id="exp" class="pri h-9 px-4 text-xs sm:text-sm font-semibold whitespace-nowrap shadow-sm" disabled title="Export complete ZIP with WAVs, SFZ, SF2, MIDI, and presets">
+            <svg class="w-4 h-4 mr-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Export ZIP
+          </button>
+        </div>
+      </div>
     </div>
     <div id="st" class="text-xs text-[var(--mu)] mt-2 min-h-[18px] font-mono"></div>
   </div>
 
-  <!-- Slice Grid List -->
-  <div id="list" class="pn grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-2 min-h-[70px]"></div>
+  <!-- Slice Grid List with Drag-Out & Classification Badges -->
+  <div id="list" class="pn grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5 min-h-[70px]"></div>
 
 </div>
 
@@ -485,7 +580,8 @@
   let hist = [], ctx = null, buf = null, mono = null, sr = 44100, dur = 0;
   let E = null, D = null, O = null, peaks = null, regions = [];
   let mode = 'shot', name = 'audio', bpm = 0, sel = -1, drag = null, playing = null;
-  let W = 0, H = 0, dpr = 1, pendingRestore = null;
+  let W = 0, H = 0, dpr = 1, pendingRestore = null, editorLoop = false;
+  let viewMode = 'waveform', specCanvas = null, isDrawing = false, drawStartT = 0, drawCurrentT = 0;
 
   const st = m => { $('#st').textContent = m; };
   const pad = n => String(n).padStart(2, '0');
@@ -497,7 +593,28 @@
       if (!AudioCtx) throw new Error('Web Audio API is not supported in this browser.');
       ctx = new AudioCtx();
     }
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
     return ctx;
+  }
+
+  // Resilient File ArrayBuffer reader with FileReader fallback
+  function readFileAsArrayBuffer(file) {
+    if (typeof file.arrayBuffer === 'function') {
+      return file.arrayBuffer().catch(() => useFileReader(file));
+    }
+    return useFileReader(file);
+  }
+
+  function useFileReader(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error('Failed to read file from disk'));
+      reader.onabort = () => reject(new Error('File reading was aborted'));
+      reader.readAsArrayBuffer(file);
+    });
   }
 
   // Cross-browser Audio Decoding
@@ -548,27 +665,37 @@
     }
   });
 
+  // Reset file input value on click so selecting the same file always triggers onchange
+  $('#file').onclick = () => {
+    $('#file').value = null;
+    getAudioCtx();
+  };
+
   $('#file').onchange = e => {
     const f = e.target.files && e.target.files[0];
     if (f) {
       loadFile(f);
-      // Reset input value so re-selecting same file triggers change
-      e.target.value = '';
     }
   };
 
   async function loadFile(f) {
+    if (!f) return;
     stop();
-    st(`Reading file "${f.name}"…`);
+    const sizeMb = (f.size / (1024 * 1024)).toFixed(2);
+    st(`Reading "${f.name}" (${sizeMb} MB)…`);
     try {
       const audioCtx = getAudioCtx();
-      st('Decoding audio data…');
-      const arrayBuf = await f.arrayBuffer();
+      st('Reading file data into memory…');
+      const arrayBuf = await readFileAsArrayBuffer(f);
+      if (!arrayBuf || arrayBuf.byteLength === 0) {
+        throw new Error('Selected file is empty (0 bytes).');
+      }
+      st(`Decoding audio waveform (${(arrayBuf.byteLength / (1024 * 1024)).toFixed(2)} MB)…`);
       const decoded = await decodeAudioBuffer(audioCtx, arrayBuf);
       initializeLoadedAudio(decoded, f.name);
     } catch (err) {
       console.error('Audio load error:', err);
-      st('Could not decode audio: ' + (err.message || 'File format not supported'));
+      st(`Could not load "${f.name}": ${err.message || 'File format not supported by browser.'}`);
     }
   }
 
@@ -588,90 +715,16 @@
 
     envelope();
     buildPeaks();
-    $('#meta').textContent = `${fileName} · ${dur.toFixed(1)} s · ${(sr / 1000).toFixed(1)} kHz · ${buf.numberOfChannels} ch`;
+    specCanvas = null; // Invalidate cached spectrogram
+    const infoText = `${fileName} · ${dur.toFixed(1)} s · ${(sr / 1000).toFixed(1)} kHz · ${buf.numberOfChannels} ch`;
+    $('#meta').textContent = infoText;
+    $('#meta').title = infoText;
     size();
     analyse();
     checkRestore();
   }
 
-  /* ---------- Built-in Demo Beat Generator ---------- */
-  $('#btnDemo').onclick = () => {
-    stop();
-    st('Generating demo beat…');
-    try {
-      const audioCtx = getAudioCtx();
-      const demoSr = audioCtx.sampleRate || 44100;
-      const demoBpm = 120;
-      const barLen = (60 / demoBpm) * 4; // 1 bar = 2.0s
-      const totalLen = barLen * 2; // 2 bars = 4.0s
-      const totalSamples = Math.floor(totalLen * demoSr);
-      const demoBuf = audioCtx.createBuffer(2, totalSamples, demoSr);
-      const L = demoBuf.getChannelData(0);
-      const R = demoBuf.getChannelData(1);
-
-      const beatSec = 60 / demoBpm;
-      const sixteenth = beatSec / 4;
-
-      // Synthesize 2 bars of punchy beat (kick, snare, hihats, sub bass)
-      for (let i = 0; i < totalSamples; i++) {
-        const t = i / demoSr;
-        const barPos = t % barLen;
-        let s = 0;
-
-        // Kick on beat 1 and 3 (0.0s and 1.0s of each bar)
-        [0, beatSec * 2].forEach(kTime => {
-          const dt = barPos - kTime;
-          if (dt >= 0 && dt < 0.3) {
-            const freq = 140 * Math.exp(-dt * 26) + 45;
-            const env = Math.exp(-dt * 12);
-            s += Math.sin(2 * Math.PI * freq * dt) * env * 0.85;
-          }
-        });
-
-        // Snare on beat 2 and 4 (0.5s and 1.5s of each bar)
-        [beatSec, beatSec * 3].forEach(sTime => {
-          const dt = barPos - sTime;
-          if (dt >= 0 && dt < 0.25) {
-            const tone = Math.sin(2 * Math.PI * 185 * dt) * Math.exp(-dt * 22) * 0.45;
-            const noise = (Math.random() * 2 - 1) * Math.exp(-dt * 16) * 0.5;
-            s += tone + noise;
-          }
-        });
-
-        // 16th Hi-Hats
-        const hatIndex = Math.floor(barPos / sixteenth);
-        const hatDt = barPos - hatIndex * sixteenth;
-        if (hatDt >= 0 && hatDt < 0.05) {
-          const accent = hatIndex % 4 === 0 ? 0.35 : (hatIndex % 2 === 0 ? 0.22 : 0.14);
-          const noise = (Math.random() * 2 - 1) * Math.exp(-hatDt * 100) * accent;
-          s += noise;
-        }
-
-        // Bass groove on offbeats
-        const bassDt = barPos - (beatSec * 0.5);
-        if (bassDt >= 0 && bassDt < 0.35) {
-          s += Math.sin(2 * Math.PI * 55 * bassDt) * Math.exp(-bassDt * 6) * 0.4;
-        }
-        const bassDt2 = barPos - (beatSec * 2.5);
-        if (bassDt2 >= 0 && bassDt2 < 0.35) {
-          s += Math.sin(2 * Math.PI * 65.4 * bassDt2) * Math.exp(-bassDt2 * 6) * 0.4;
-        }
-
-        // Soft clip
-        const out = Math.max(-0.95, Math.min(0.95, s));
-        L[i] = out;
-        R[i] = out;
-      }
-
-      initializeLoadedAudio(demoBuf, 'Demo_Beat_120bpm.wav');
-      st('Demo beat loaded! Click any slice or use Zoom editor.');
-    } catch (err) {
-      console.error('Demo generation error:', err);
-      st('Error creating demo beat: ' + err.message);
-    }
-  };
-
-  /* ---------- Audio Analysis ---------- */
+  /* ---------- Audio Analysis & Heuristic Classifier ---------- */
   function envelope() {
     const n = Math.floor(mono.length / HOP);
     E = new Float32Array(n);
@@ -706,6 +759,50 @@
     }
   }
 
+  // Spectral / Zero-Crossing Transient Classifier (Kick, Snare, Hi-Hat, Perc, Sample)
+  function classifySlice(sT, eT) {
+    if (mode === 'loop') return 'loop';
+    const sIdx = Math.floor(sT * sr);
+    const eIdx = Math.min(mono.length, Math.floor(eT * sr));
+    const len = eIdx - sIdx;
+    if (len < 64) return 'sample';
+
+    // 1. Zero-Crossing Rate (ZCR)
+    let zc = 0;
+    for (let i = sIdx; i < eIdx - 1; i++) {
+      if ((mono[i] >= 0 && mono[i + 1] < 0) || (mono[i] < 0 && mono[i + 1] >= 0)) zc++;
+    }
+    const zcr = zc / len;
+
+    // 2. Low Frequency Energy (< 250 Hz) vs High Frequency Energy (> 3 kHz)
+    // Approximate via running difference and moving average
+    let lowEnergy = 0, highEnergy = 0, totalEnergy = 0;
+    const checkLen = Math.min(len, Math.floor(0.15 * sr)); // First 150 ms
+    let prev = 0;
+    for (let i = 0; i < checkLen; i++) {
+      const val = mono[sIdx + i];
+      totalEnergy += val * val;
+      const diff = val - prev;
+      highEnergy += diff * diff;
+      prev = val;
+    }
+    totalEnergy = Math.max(1e-9, totalEnergy);
+    const hfRatio = highEnergy / totalEnergy;
+    const durSec = eT - sT;
+
+    // Classification heuristics
+    if (zcr < 0.05 && hfRatio < 0.25) {
+      return 'kick';
+    } else if (zcr > 0.16 && hfRatio > 0.8 && durSec < 0.45) {
+      return 'hihat';
+    } else if (zcr >= 0.08 && zcr <= 0.18 && hfRatio >= 0.35 && durSec < 0.8) {
+      return 'snare';
+    } else if (durSec < 0.2) {
+      return 'perc';
+    }
+    return 'sample';
+  }
+
   function analyse(auto) {
     if (!buf) return;
     stop();
@@ -720,13 +817,20 @@
       }
       regions = grid(bpm);
     }
-    regions.forEach(r => { r.s0 = r.s; r.e0 = r.e; });
+    regions.forEach(r => {
+      r.s0 = r.s;
+      r.e0 = r.e;
+      r.tag = classifySlice(r.s, r.e);
+      r.gain = r.gain || 0;
+      r.pitch = r.pitch || 0;
+      r.rev = !!r.rev;
+    });
     hist = [];
     cur = null;
     fresh = true;
     $('#exp').disabled = false;
     refresh();
-    st(`Analysis complete: ${regions.length} slice${regions.length === 1 ? '' : 's'} found.`);
+    st(`Analysis complete: ${regions.length} slice${regions.length === 1 ? '' : 's'} detected.`);
   }
 
   function shots() {
@@ -841,7 +945,77 @@
     return 20 * Math.log10(Math.sqrt(s / Math.max(1, (b - a) / 2)) + 1e-9);
   }
 
-  /* ---------- Waveform Rendering & Interaction ---------- */
+  /* ---------- Fast STFT Spectrogram Generator ---------- */
+  function renderSpectrogram(targetW, targetH) {
+    if (!mono || mono.length < 128) return null;
+    const offscreen = document.createElement('canvas');
+    offscreen.width = targetW;
+    offscreen.height = targetH;
+    const g = offscreen.getContext('2d');
+
+    const fftSize = 256;
+    const hop = Math.max(32, Math.floor((mono.length - fftSize) / targetW));
+    const numCols = Math.min(targetW, Math.floor((mono.length - fftSize) / hop));
+    const numBins = Math.min(targetH, 64);
+    const yStep = targetH / numBins;
+
+    const imgData = g.createImageData(targetW, targetH);
+    const data = imgData.data;
+
+    function colorMap(mag) {
+      const v = Math.max(0, Math.min(1, mag));
+      const r = Math.floor(Math.min(255, v < 0.5 ? v * 2 * 210 : 210 + (v - 0.5) * 2 * 45));
+      const gr = Math.floor(Math.min(255, v < 0.6 ? v * 1.5 * 130 : 180 + (v - 0.6) * 2.5 * 75));
+      const b = Math.floor(Math.min(255, v < 0.25 ? 60 + v * 4 * 195 : Math.max(0, 255 - (v - 0.25) * 340)));
+      return [r, gr, b];
+    }
+
+    // Precompute cos/sin tables for 64 frequency bins
+    const cosTable = [];
+    const sinTable = [];
+    for (let b = 0; b < numBins; b++) {
+      const cosB = new Float32Array(fftSize);
+      const sinB = new Float32Array(fftSize);
+      const freq = (2 * Math.PI * (b + 1) * 2) / fftSize;
+      for (let k = 0; k < fftSize; k++) {
+        cosB[k] = Math.cos(freq * k);
+        sinB[k] = Math.sin(freq * k);
+      }
+      cosTable.push(cosB);
+      sinTable.push(sinB);
+    }
+
+    const colMags = new Float32Array(numBins);
+
+    for (let col = 0; col < numCols; col++) {
+      const offset = col * hop;
+      for (let b = 0; b < numBins; b++) {
+        const cB = cosTable[b];
+        const sB = sinTable[b];
+        let re = 0, im = 0;
+        for (let k = 0; k < fftSize; k += 4) {
+          const s = mono[offset + k];
+          re += s * cB[k];
+          im -= s * sB[k];
+        }
+        colMags[b] = Math.sqrt(re * re + im * im) * 0.25;
+      }
+
+      for (let y = 0; y < targetH; y++) {
+        const b = Math.min(numBins - 1, Math.floor((targetH - 1 - y) / yStep));
+        const [cr, cg, cb] = colorMap(colMags[b]);
+        const idx = (y * targetW + col) * 4;
+        data[idx] = cr;
+        data[idx + 1] = cg;
+        data[idx + 2] = cb;
+        data[idx + 3] = 255;
+      }
+    }
+    g.putImageData(imgData, 0, 0);
+    return offscreen;
+  }
+
+  /* ---------- Waveform & Spectrogram Rendering ---------- */
   function size() {
     const c = $('#cv');
     dpr = window.devicePixelRatio || 1;
@@ -860,9 +1034,9 @@
 
     if (!buf || !peaks) {
       g.fillStyle = cs.getPropertyValue('--mu');
-      g.font = '500 14px sans-serif';
+      g.font = '500 13px sans-serif';
       g.textAlign = 'center';
-      g.fillText('Drop an audio file, choose file, or click "Load Demo Beat" above', W / 2, H / 2);
+      g.fillText('Choose an audio or video file above, or drag and drop onto this window', W / 2, H / 2);
       return;
     }
 
@@ -871,25 +1045,71 @@
     const ink = cs.getPropertyValue('--ink').trim();
     const m = H / 2, N = peaks.length / 2;
 
+    // View Mode: Spectrogram vs Waveform
+    if (viewMode === 'spectrogram') {
+      if (!specCanvas || specCanvas.width !== Math.floor(W)) {
+        specCanvas = renderSpectrogram(Math.floor(W), Math.floor(H));
+      }
+      if (specCanvas) {
+        g.drawImage(specCanvas, 0, 0, W, H);
+      }
+    } else {
+      // Standard Waveform render
+      g.globalAlpha = 0.85;
+      g.fillStyle = ink;
+      for (let x = 0; x < W; x++) {
+        const k = Math.min(N - 1, Math.floor(x / W * N));
+        g.fillRect(x, m + peaks[k * 2] * m * 0.95, 1, Math.max(1, (peaks[k * 2 + 1] - peaks[k * 2]) * m * 0.95));
+      }
+    }
+
+    // Interactive Sensitivity Threshold Line Overlay (One-Shot Mode)
+    if (mode === 'shot' && viewMode === 'waveform') {
+      const sens = +$('#sens').value;
+      const thrRatio = 1 - (sens - 20) / 50; // Normalize 20..70 dB
+      const lineY = m - thrRatio * m * 0.85;
+      const lineYBottom = m + thrRatio * m * 0.85;
+
+      g.save();
+      g.strokeStyle = 'rgba(239, 68, 68, 0.7)'; // Red dashed threshold
+      g.lineWidth = 1;
+      g.setLineDash([4, 4]);
+      g.beginPath();
+      g.moveTo(0, lineY);
+      g.lineTo(W, lineY);
+      g.moveTo(0, lineYBottom);
+      g.lineTo(W, lineYBottom);
+      g.stroke();
+      g.fillStyle = 'rgba(239, 68, 68, 0.85)';
+      g.font = '10px monospace';
+      g.fillText(`−${sens} dB Threshold`, 10, lineY - 3);
+      g.restore();
+    }
+
+    // Regions rendering
     regions.forEach((r, i) => {
       const x0 = r.s / dur * W, x1 = r.e / dur * W;
-      g.globalAlpha = r.on ? 0.18 : 0.07;
+      g.globalAlpha = r.on ? 0.22 : 0.08;
       g.fillStyle = r.on ? ac : off;
       g.fillRect(x0, 0, x1 - x0, H);
       if (i === sel) {
-        g.globalAlpha = 0.32;
+        g.globalAlpha = 0.38;
         g.fillRect(x0, 0, x1 - x0, H);
       }
     });
 
-    gridLines(g, 0, dur, W, H, t => t / dur * W, ink);
-
-    g.globalAlpha = 0.85;
-    g.fillStyle = ink;
-    for (let x = 0; x < W; x++) {
-      const k = Math.min(N - 1, Math.floor(x / W * N));
-      g.fillRect(x, m + peaks[k * 2] * m * 0.95, 1, Math.max(1, (peaks[k * 2 + 1] - peaks[k * 2]) * m * 0.95));
+    // Draw active user slice-creation drag box
+    if (isDrawing) {
+      const xStart = Math.min(drawStartT, drawCurrentT) / dur * W;
+      const xEnd = Math.max(drawStartT, drawCurrentT) / dur * W;
+      g.fillStyle = 'rgba(37, 99, 235, 0.35)';
+      g.fillRect(xStart, 0, xEnd - xStart, H);
+      g.strokeStyle = 'rgba(37, 99, 235, 0.9)';
+      g.lineWidth = 2;
+      g.strokeRect(xStart, 0, xEnd - xStart, H);
     }
+
+    gridLines(g, 0, dur, W, H, t => t / dur * W, ink);
 
     g.globalAlpha = 1;
     regions.forEach(r => {
@@ -904,6 +1124,25 @@
     marks(g, t => t / dur * W, H, 0, dur);
   }
 
+  // Toggle View Modes
+  $('#btnViewWave').onclick = () => {
+    viewMode = 'waveform';
+    $('#btnViewWave').classList.add('act', 'bg-[var(--ac)]', 'text-white');
+    $('#btnViewWave').classList.remove('bg-[var(--bg)]', 'text-[var(--ink)]');
+    $('#btnViewSpec').classList.remove('act', 'bg-[var(--ac)]', 'text-white');
+    $('#btnViewSpec').classList.add('bg-[var(--bg)]', 'text-[var(--ink)]');
+    draw();
+  };
+
+  $('#btnViewSpec').onclick = () => {
+    viewMode = 'spectrogram';
+    $('#btnViewSpec').classList.add('act', 'bg-[var(--ac)]', 'text-white');
+    $('#btnViewSpec').classList.remove('bg-[var(--bg)]', 'text-[var(--ink)]');
+    $('#btnViewWave').classList.remove('act', 'bg-[var(--ac)]', 'text-white');
+    $('#btnViewWave').classList.add('bg-[var(--bg)]', 'text-[var(--ink)]');
+    draw();
+  };
+
   function edgeAt(x) {
     let best = null, bd = 22;
     regions.forEach((r, i) => {
@@ -917,13 +1156,17 @@
 
   const cv = $('#cv');
   cv.addEventListener('pointerdown', e => {
-    if (!buf) return;
+    if (!buf) {
+      $('#file').click();
+      return;
+    }
     const x = e.clientX - cv.getBoundingClientRect().left;
     cv.setPointerCapture(e.pointerId);
     const h = edgeAt(x);
     if (h) {
       drag = { ...h, moved: false };
       sel = h.i;
+      isDrawing = false;
     } else {
       const t = x / W * dur;
       const i = regions.findIndex(r => t >= r.s && t <= r.e);
@@ -931,9 +1174,14 @@
         sel = i;
         play(regions[i]);
         openEd(i);
+        isDrawing = false;
       } else {
-        sel = -1;
+        // Start Click & Drag Region Creation
+        isDrawing = true;
+        drawStartT = t;
+        drawCurrentT = t;
         cur = t;
+        sel = -1;
         closeEd();
       }
       drag = null;
@@ -943,8 +1191,13 @@
   });
 
   cv.addEventListener('pointermove', e => {
-    if (!drag) return;
     const x = e.clientX - cv.getBoundingClientRect().left;
+    if (isDrawing) {
+      drawCurrentT = Math.max(0, Math.min(dur, x / W * dur));
+      draw();
+      return;
+    }
+    if (!drag) return;
     const r = regions[drag.i];
     const t = gs(Math.max(0, Math.min(dur, x / W * dur)));
     if (!drag.moved) pushHist();
@@ -956,6 +1209,37 @@
   });
 
   const endDrag = () => {
+    if (isDrawing) {
+      isDrawing = false;
+      const sT = Math.min(drawStartT, drawCurrentT);
+      const eT = Math.max(drawStartT, drawCurrentT);
+      if (eT - sT > 0.025) { // Minimum 25 ms region
+        pushHist();
+        const newSlice = {
+          s: sT,
+          e: eT,
+          on: true,
+          manual: true,
+          s0: sT,
+          e0: eT,
+          tag: classifySlice(sT, eT),
+          gain: 0,
+          pitch: 0,
+          rev: false
+        };
+        snapEdge(newSlice, 's');
+        snapEdge(newSlice, 'e');
+        regions.push(newSlice);
+        regions.sort((a, b) => a.s - b.s);
+        const idx = regions.indexOf(newSlice);
+        sel = idx;
+        openEd(idx);
+        refresh();
+        st(`Created new slice: ${(newSlice.e - newSlice.s).toFixed(2)}s`);
+      } else {
+        draw();
+      }
+    }
     if (drag && drag.moved) {
       if (!gridOn()) snapEdge(regions[drag.i], drag.k);
       refresh();
@@ -965,17 +1249,52 @@
   cv.addEventListener('pointerup', endDrag);
   cv.addEventListener('pointercancel', endDrag);
 
-  /* ---------- Slices List ---------- */
+  /* ---------- Slices List & Direct DAW Drag-Out ---------- */
   function list() {
-    $('#list').innerHTML = regions.length ? regions.map((r, i) => `
-      <div class="row${r.on ? ' on' : ''}${i === sel ? ' sel' : ''}">
-        <button class="chk" data-t="${i}" aria-label="Include slice ${i + 1}">${r.on ? '✓' : ''}</button>
-        <button class="nm" data-p="${i}">${mode === 'loop' ? 'Loop' : 'Shot'} ${pad(i + 1)} · ${(r.e - r.s).toFixed(2)} s · ${rmsDb(r).toFixed(0)} dB</button>
+    $('#list').innerHTML = regions.length ? regions.map((r, i) => {
+      const tagClass = `tag-${r.tag || 'sample'}`;
+      const tagLabel = (r.tag || 'sample').toUpperCase();
+      const soundModifiers = (r.rev ? '⇄ ' : '') + (r.gain ? `${r.gain > 0 ? '+' : ''}${r.gain}dB ` : '') + (r.pitch ? `${r.pitch > 0 ? '+' : ''}${r.pitch}st` : '');
+
+      return `
+      <div class="row${r.on ? ' on' : ''}${i === sel ? ' sel' : ''} group" draggable="true" data-drag-idx="${i}" title="Drag slice out directly to desktop or DAW">
+        <button class="chk shrink-0" data-t="${i}" aria-label="Toggle inclusion of slice ${i + 1}" title="Toggle export inclusion">${r.on ? '✓' : ''}</button>
+        <button class="nm flex-1 text-left px-2.5 py-1.5 min-w-0 truncate hover:text-[var(--ac)] transition-colors" data-p="${i}" title="Open Zoom Editor">
+          <div class="flex items-center gap-1.5 truncate">
+            <span class="font-medium text-xs text-[var(--ink)] truncate">${mode === 'loop' ? 'Loop' : 'Shot'} ${pad(i + 1)}</span>
+            <span class="tag-pill ${tagClass}">${tagLabel}</span>
+            ${soundModifiers ? `<span class="text-[10px] text-blue-500 font-mono">${soundModifiers}</span>` : ''}
+          </div>
+          <div class="text-[11px] text-[var(--mu)] font-mono tabular-nums truncate">${(r.e - r.s).toFixed(2)}s · ${rmsDb(r).toFixed(0)}dB</div>
+        </button>
+        <button class="px-2.5 h-10 shrink-0 text-xs text-[var(--mu)] hover:text-[var(--ink)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors" data-audition="${i}" title="Quick Play / Audition">▶</button>
+        <button class="px-2.5 h-10 shrink-0 text-xs text-[var(--mu)] hover:text-[var(--ink)] hover:bg-black/5 dark:hover:bg-white/5 border-l border-[var(--ln)] transition-colors" data-dl="${i}" title="Download WAV">⭳</button>
       </div>
-    `).join('') : '<span class="text-sm text-[var(--mu)] col-span-full py-2">No slices found. Try raising sensitivity or lowering minimum gap.</span>';
+    `;
+    }).join('') : '<span class="text-xs text-[var(--mu)] col-span-full py-2">No slices found. Try raising sensitivity or click+drag the waveform to create a slice.</span>';
 
     const n = regions.filter(r => r.on).length;
     $('#cnt').textContent = `${n} of ${regions.length} selected` + (mode === 'loop' && bpm ? ` · ${bpm} BPM` : '');
+
+    // Setup Drag-and-drop out to desktop / DAWs
+    document.querySelectorAll('.row[draggable=true]').forEach(el => {
+      el.addEventListener('dragstart', e => {
+        const idx = +el.dataset.dragIdx;
+        const r = regions[idx];
+        if (!r) return;
+        const bits = +$('#bits').value;
+        const norm = $('#norm').value === '1';
+        const chs = render(r);
+        if (norm) normalizeAudio(chs);
+        const wavData = wav(chs, bits);
+        const base = ($('#pfx').value || '').trim().replace(/[^\w-]+/g, '_') || name;
+        const fn = mode === 'loop' ? `${base}_loop_${pad(idx + 1)}.wav` : `${base}_${r.tag || 'shot'}_${pad(idx + 1)}.wav`;
+        const blob = new Blob([wavData], { type: 'audio/wav' });
+        const blobUrl = URL.createObjectURL(blob);
+        e.dataTransfer.setData('DownloadURL', `audio/wav:${fn}:${blobUrl}`);
+        e.dataTransfer.setData('text/plain', fn);
+      });
+    });
   }
 
   function refresh() {
@@ -995,6 +1314,14 @@
       const r = regions[+t.dataset.t];
       r.on = !r.on;
       refresh();
+    } else if (t.dataset.audition !== undefined) {
+      const idx = +t.dataset.audition;
+      sel = idx;
+      play(regions[idx]);
+      refresh();
+    } else if (t.dataset.dl !== undefined) {
+      const idx = +t.dataset.dl;
+      downloadSingleSlice(regions[idx], idx);
     } else if (t.dataset.p !== undefined) {
       sel = +t.dataset.p;
       play(regions[sel]);
@@ -1013,7 +1340,7 @@
     refresh();
   };
 
-  /* ---------- Preview Playback ---------- */
+  /* ---------- Preview Playback with Sound Shaping ---------- */
   function stop() {
     ph = null;
     if (playing) {
@@ -1025,24 +1352,59 @@
     }
   }
 
-  function play(r) {
+  function play(r, forceLoop) {
     if (!buf) return;
     stop();
     const audioCtx = getAudioCtx();
     if (audioCtx.state === 'suspended') {
       audioCtx.resume().catch(() => {});
     }
+    const isLooped = forceLoop !== undefined ? forceLoop : (mode === 'loop' || (edOpen && editorLoop));
     const s = audioCtx.createBufferSource();
-    s.buffer = buf;
-    s.connect(audioCtx.destination);
-    if (mode === 'loop') {
-      s.loop = true;
-      s.loopStart = r.s;
-      s.loopEnd = r.e;
-      s.start(0, r.s);
+
+    // Sound Shaping: Reverse, Pitch, Gain
+    if (r.rev) {
+      // Create reversed slice buffer on the fly
+      const s0 = Math.round(r.s * sr);
+      const e0 = Math.round(r.e * sr);
+      const len = e0 - s0;
+      const revBuf = audioCtx.createBuffer(buf.numberOfChannels, len, sr);
+      for (let c = 0; c < buf.numberOfChannels; c++) {
+        const srcData = buf.getChannelData(c);
+        const destData = revBuf.getChannelData(c);
+        for (let i = 0; i < len; i++) destData[i] = srcData[e0 - 1 - i];
+      }
+      s.buffer = revBuf;
+      if (isLooped) {
+        s.loop = true;
+        s.start(0);
+      } else {
+        s.start(0);
+      }
     } else {
-      s.start(0, r.s, r.e - r.s);
+      s.buffer = buf;
+      if (isLooped) {
+        s.loop = true;
+        s.loopStart = r.s;
+        s.loopEnd = r.e;
+        s.start(0, r.s);
+      } else {
+        s.start(0, r.s, r.e - r.s);
+      }
     }
+
+    // Apply Pitch shift via playbackRate
+    if (r.pitch) {
+      s.playbackRate.value = Math.pow(2, r.pitch / 12);
+    }
+
+    // Apply Gain Trim Node
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = Math.pow(10, (r.gain || 0) / 20);
+
+    s.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
     s.onended = () => {
       if (playing === s) {
         playing = null;
@@ -1052,7 +1414,7 @@
       }
     };
     playing = s;
-    ph = { t0: audioCtx.currentTime, r, loop: mode === 'loop' };
+    ph = { t0: audioCtx.currentTime, r, loop: isLooped };
     startTick();
   }
 
@@ -1075,7 +1437,10 @@
 
   $('#mShot').onclick = () => setMode('shot');
   $('#mLoop').onclick = () => setMode('loop');
-  $('#sens').oninput = e => $('#sensV').textContent = e.target.value + ' dB';
+  $('#sens').oninput = e => {
+    $('#sensV').textContent = e.target.value + ' dB';
+    draw(); // Redraw threshold line dynamically
+  };
   $('#gap').oninput = e => $('#gapV').textContent = e.target.value + ' ms';
 
   ['sens', 'gap', 'bars'].forEach(id => {
@@ -1168,7 +1533,9 @@
       return;
     }
     pushHist();
-    regions.splice(sel, 1, { ...r, e: cur, e0: cur, manual: true }, { ...r, s: cur, s0: cur, manual: true });
+    const s1 = { ...r, e: cur, e0: cur, manual: true, tag: classifySlice(r.s, cur) };
+    const s2 = { ...r, s: cur, s0: cur, manual: true, tag: classifySlice(cur, r.e) };
+    regions.splice(sel, 1, s1, s2);
     cur = null;
     fitEd();
     refresh();
@@ -1181,7 +1548,15 @@
       return;
     }
     pushHist();
-    regions.splice(sel, 2, { s: r.s, e: n.e, on: r.on || n.on, manual: true, s0: r.s0, e0: n.e0 });
+    regions.splice(sel, 2, {
+      ...r,
+      e: n.e,
+      on: r.on || n.on,
+      manual: true,
+      s0: r.s0,
+      e0: n.e0,
+      tag: classifySlice(r.s, n.e)
+    });
     fitEd();
     refresh();
   };
@@ -1209,7 +1584,18 @@
       return;
     }
     pushHist();
-    const n = { s: cur, e, on: true, manual: true, s0: cur, e0: e };
+    const n = {
+      s: cur,
+      e,
+      on: true,
+      manual: true,
+      s0: cur,
+      e0: e,
+      tag: classifySlice(cur, e),
+      gain: 0,
+      pitch: 0,
+      rev: false
+    };
     regions.push(n);
     regions.sort((a, b) => a.s - b.s);
     cur = null;
@@ -1360,11 +1746,73 @@
     sel = i;
     edOpen = true;
     $('#ed').classList.remove('hide');
+    const r = regions[sel];
+    if (r) {
+      $('#edGain').value = r.gain || 0;
+      $('#edGainV').textContent = `${(r.gain || 0) > 0 ? '+' : ''}${(r.gain || 0).toFixed(1)} dB`;
+      $('#edPitch').value = r.pitch || 0;
+      $('#edPitchV').textContent = `${(r.pitch || 0) > 0 ? '+' : ''}${r.pitch || 0} st`;
+      $('#edRev').textContent = '⇄ Reverse: ' + (r.rev ? 'On' : 'Off');
+      $('#edRev').classList.toggle('act', !!r.rev);
+      updateTagBadge(r.tag);
+    }
     sizeEd();
     fitEd();
     list();
     draw();
   }
+
+  function updateTagBadge(tag) {
+    const b = $('#edTagBadge');
+    if (!b) return;
+    b.className = `tag-pill tag-${tag || 'sample'} cursor-pointer`;
+    b.textContent = (tag || 'sample').toUpperCase();
+  }
+
+  // Tag classification toggle on click in editor
+  $('#edTagBadge').onclick = () => {
+    if (sel < 0 || !regions[sel]) return;
+    const r = regions[sel];
+    const tags = ['kick', 'snare', 'hihat', 'perc', 'sample'];
+    const curIdx = tags.indexOf(r.tag || 'sample');
+    r.tag = tags[(curIdx + 1) % tags.length];
+    updateTagBadge(r.tag);
+    list();
+  };
+
+  // Sound Shaping Controls
+  $('#edRev').onclick = () => {
+    if (sel < 0 || !regions[sel]) return;
+    const r = regions[sel];
+    pushHist();
+    r.rev = !r.rev;
+    $('#edRev').textContent = '⇄ Reverse: ' + (r.rev ? 'On' : 'Off');
+    $('#edRev').classList.toggle('act', r.rev);
+    list();
+    if (playing) play(r);
+  };
+
+  $('#edGain').oninput = e => {
+    if (sel < 0 || !regions[sel]) return;
+    const r = regions[sel];
+    r.gain = parseFloat(e.target.value);
+    $('#edGainV').textContent = `${r.gain > 0 ? '+' : ''}${r.gain.toFixed(1)} dB`;
+  };
+  $('#edGain').onchange = () => { pushHist(); list(); };
+
+  function setPitch(p) {
+    if (sel < 0 || !regions[sel]) return;
+    const r = regions[sel];
+    r.pitch = Math.max(-12, Math.min(12, p));
+    $('#edPitch').value = r.pitch;
+    $('#edPitchV').textContent = `${r.pitch > 0 ? '+' : ''}${r.pitch} st`;
+    list();
+    if (playing) play(r);
+  }
+  $('#edPitch').oninput = e => setPitch(parseInt(e.target.value, 10));
+  $('#edPitchDn').onclick = () => { if (sel >= 0 && regions[sel]) setPitch((regions[sel].pitch || 0) - 1); };
+  $('#edPitchUp').onclick = () => { if (sel >= 0 && regions[sel]) setPitch((regions[sel].pitch || 0) + 1); };
+  $('#edPitchRst').onclick = () => setPitch(0);
 
   function closeEd() {
     edOpen = false;
@@ -1454,7 +1902,8 @@
     g.fillText(ve.toFixed(3) + ' s', W2 - 6, H2 - 6);
 
     $('#edT').textContent = (mode === 'loop' ? 'Loop ' : 'Shot ') + pad(sel + 1);
-    $('#edR').textContent = `Start ${r.s.toFixed(4)} s · End ${r.e.toFixed(4)} s · Length ${(r.e - r.s).toFixed(4)} s`;
+    $('#edR').textContent = `Start ${r.s.toFixed(4)}s · End ${r.e.toFixed(4)}s · Len ${(r.e - r.s).toFixed(4)}s`;
+    $('#edR').title = `Start ${r.s.toFixed(4)}s · End ${r.e.toFixed(4)}s · Length ${(r.e - r.s).toFixed(4)}s`;
   }
 
   function snapEdge(r, k) {
@@ -1555,10 +2004,19 @@
   $('#edP').onclick = () => { if (regions[sel]) play(regions[sel]); };
   $('#edC').onclick = () => { closeEd(); sel = -1; refresh(); };
 
+  $('#edLoopToggle').onclick = e => {
+    editorLoop = !editorLoop;
+    e.target.textContent = 'Loop: ' + (editorLoop ? 'On' : 'Off');
+    e.target.classList.toggle('act', editorLoop);
+    if (playing && regions[sel]) {
+      play(regions[sel]);
+    }
+  };
+
   $('#snap').onclick = e => {
     snapOn = !snapOn;
     e.target.classList.toggle('act', snapOn);
-    e.target.textContent = 'Snap to zero crossing: ' + (snapOn ? 'On' : 'Off');
+    e.target.textContent = 'Zero-Snap: ' + (snapOn ? 'On' : 'Off');
   };
 
   document.querySelectorAll('.nud').forEach(box => {
@@ -1602,11 +2060,12 @@
     }
   });
 
-  /* ---------- Export & Audio Synthesis ---------- */
+  /* ---------- Export & Audio Synthesis with Equal Power & Sound Shaping ---------- */
   function render(r) {
     const s0 = Math.round(r.s * sr);
     const e = Math.round(r.e * sr);
     const fade = Math.round(+$('#fade').value / 1000 * sr);
+    const isEqualPower = $('#fadeCurve').value === 'equal_power';
     const chs = Math.min(2, buf.numberOfChannels);
     let s = s0;
 
@@ -1620,18 +2079,32 @@
       }
     }
 
-    const n = e - s, out = [];
+    const n = Math.max(1, e - s);
+    const out = [];
+    const gainMul = Math.pow(10, (r.gain || 0) / 20);
+
     for (let c = 0; c < chs; c++) {
       const src = buf.getChannelData(c);
-      const o = new Float32Array(n);
+      let o = new Float32Array(n);
+
+      // Base channel copy
       for (let i = 0; i < n; i++) o[i] = src[s + i];
 
+      // Equal Power vs Linear Loop Crossfading
       if (mode === 'loop') {
         const x = Math.min(fade, n >> 2);
         if (x > 0 && e + x <= src.length) {
           for (let i = 0; i < x; i++) {
-            const w = i / x;
-            o[i] = src[s + i] * w + src[e + i] * (1 - w);
+            let w1, w2;
+            if (isEqualPower) {
+              const theta = (Math.PI / 2) * (i / x);
+              w1 = Math.sin(theta);
+              w2 = Math.cos(theta);
+            } else {
+              w1 = i / x;
+              w2 = 1 - w1;
+            }
+            o[i] = src[s + i] * w1 + src[e + i] * w2;
           }
         } else {
           const f = Math.min(fade || 64, n >> 2);
@@ -1646,9 +2119,51 @@
         for (let i = 0; i < fi; i++) o[i] *= i / fi;
         for (let i = 0; i < fo; i++) o[n - 1 - i] *= i / fo;
       }
+
+      // Reverse Sound Shaping
+      if (r.rev) {
+        o.reverse();
+      }
+
+      // Gain Trim Shaping
+      if (gainMul !== 1) {
+        for (let i = 0; i < n; i++) o[i] *= gainMul;
+      }
+
+      // Pitch Shift Resampling (if semitones applied)
+      if (r.pitch && r.pitch !== 0) {
+        const rate = Math.pow(2, r.pitch / 12);
+        const newLen = Math.floor(n / rate);
+        const resampled = new Float32Array(newLen);
+        for (let i = 0; i < newLen; i++) {
+          const origPos = i * rate;
+          const i0 = Math.floor(origPos);
+          const i1 = Math.min(n - 1, i0 + 1);
+          const frac = origPos - i0;
+          resampled[i] = o[i0] * (1 - frac) + o[i1] * frac;
+        }
+        o = resampled;
+      }
+
       out.push(o);
     }
     return out;
+  }
+
+  function normalizeAudio(chs) {
+    let pk = 0;
+    chs.forEach(c => {
+      for (let j = 0; j < c.length; j++) {
+        const a = Math.abs(c[j]);
+        if (a > pk) pk = a;
+      }
+    });
+    if (pk > 0) {
+      const g = 0.891 / pk; // -1 dBFS
+      chs.forEach(c => {
+        for (let j = 0; j < c.length; j++) c[j] *= g;
+      });
+    }
   }
 
   function wav(chs, bits) {
@@ -1693,6 +2208,416 @@
     return b;
   }
 
+  function downloadSingleSlice(r, i) {
+    const base = ($('#pfx').value || '').trim().replace(/[^\w-]+/g, '_') || name;
+    const bits = +$('#bits').value;
+    const norm = $('#norm').value === '1';
+    const chs = render(r);
+    if (norm) normalizeAudio(chs);
+    const fn = mode === 'loop'
+      ? `${base}_loop_${Math.round(bpm)}bpm_${$('#bars').value}bar_${pad(i + 1)}.wav`
+      : `${base}_${r.tag || 'shot'}_${pad(i + 1)}.wav`;
+    const wavData = wav(chs, bits);
+    const blob = new Blob([wavData], { type: 'audio/wav' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fn;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    st(`Downloaded ${fn}`);
+  }
+
+  $('#edDl').onclick = () => {
+    if (sel >= 0 && regions[sel]) {
+      downloadSingleSlice(regions[sel], sel);
+    }
+  };
+
+  /* ---------- Correct Chronological MIDI File (.mid) Generator ---------- */
+  function writeVarLen(val) {
+    let buffer = val & 0x7F;
+    const bytes = [];
+    while ((val >>= 7)) {
+      buffer <<= 8;
+      buffer |= ((val & 0x7F) | 0x80);
+    }
+    while (true) {
+      bytes.push(buffer & 0xFF);
+      if (buffer & 0x80) buffer >>= 8;
+      else break;
+    }
+    return bytes;
+  }
+
+  function generateMidi(sliceRegions, midiBpm) {
+    const tempo = midiBpm || 120;
+    const microsecondsPerQuarter = Math.round(60000000 / tempo);
+    const ticksPerQuarter = 480;
+    const secPerBeat = 60 / tempo;
+    const events = [];
+
+    // Track Name Meta-Event (Time 0)
+    events.push({ time: 0, priority: 0, bytes: [0xFF, 0x03, 0x06, 0x53, 0x6C, 0x69, 0x63, 0x65, 0x73] });
+    // Set Tempo Meta-Event (Time 0)
+    events.push({
+      time: 0,
+      priority: 1,
+      bytes: [
+        0xFF, 0x51, 0x03,
+        (microsecondsPerQuarter >> 16) & 0xFF,
+        (microsecondsPerQuarter >> 8) & 0xFF,
+        microsecondsPerQuarter & 0xFF
+      ]
+    });
+
+    const sorted = [...sliceRegions].sort((a, b) => a.s - b.s);
+
+    sorted.forEach((r, idx) => {
+      const noteNum = 36 + (idx % 48); // Start at C1 (36)
+      const startTick = Math.max(0, Math.round((r.s / secPerBeat) * ticksPerQuarter));
+      const durSec = Math.max(0.04, r.e - r.s);
+      const durTicks = Math.max(60, Math.round((durSec / secPerBeat) * ticksPerQuarter));
+      const endTick = startTick + durTicks;
+
+      // Note On
+      events.push({ time: startTick, priority: 3, bytes: [0x90, noteNum, 100] });
+      // Note Off (Priority 2 ensures note-off is ordered before note-on if coincident)
+      events.push({ time: endTick, priority: 2, bytes: [0x80, noteNum, 0] });
+    });
+
+    // Chronological sort
+    events.sort((a, b) => {
+      if (a.time !== b.time) return a.time - b.time;
+      return a.priority - b.priority;
+    });
+
+    const trackData = [];
+    let lastTick = 0;
+    for (const ev of events) {
+      const delta = Math.max(0, ev.time - lastTick);
+      lastTick = ev.time;
+      trackData.push(...writeVarLen(delta));
+      trackData.push(...ev.bytes);
+    }
+
+    // End of track event (0x00 0xFF 0x2F 0x00)
+    trackData.push(0x00, 0xFF, 0x2F, 0x00);
+
+    const trackLen = trackData.length;
+    const midiBytes = new Uint8Array(14 + 8 + trackLen);
+    const view = new DataView(midiBytes.buffer);
+
+    // MThd Header
+    view.setUint32(0, 0x4D546864); // 'MThd'
+    view.setUint32(4, 6);
+    view.setUint16(8, 0); // Type 0 (Single track)
+    view.setUint16(10, 1);
+    view.setUint16(12, ticksPerQuarter);
+
+    // MTrk Chunk
+    view.setUint32(14, 0x4D54726B); // 'MTrk'
+    view.setUint32(18, trackLen);
+    midiBytes.set(trackData, 22);
+
+    return midiBytes.buffer;
+  }
+
+  /* ---------- SFZ Generator (Mighty Synth iOS Compatible) ---------- */
+  function generateSfz(sliceFiles) {
+    let sfz = `// Slicer SFZ Instrument Map\n// Compatible with iOS Mighty Synth, Sforzando, bs-16i, AudioKit\n<control>\ndefault_path=\n\n<global>\nloop_mode=one_shot\nampeg_attack=0.001\nampeg_decay=0.001\nampeg_sustain=100\nampeg_release=0.2\n\n<group>\n\n`;
+    sliceFiles.forEach((file, idx) => {
+      const key = 36 + (idx % 60);
+      sfz += `<region> sample=${file} lokey=${key} hikey=${key} pitch_keycenter=${key}\n`;
+    });
+    return sfz;
+  }
+
+  function generateDecentSamplerPreset(kitName, sliceFiles) {
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<DecentSampler minVersion="1.0.0">\n  <ui width="812" height="375">\n    <tab name="main">\n      <label text="${kitName}" x="30" y="20" width="300" height="30" fontSize="22"/>\n    </tab>\n  </ui>\n  <groups>\n    <group>\n`;
+    sliceFiles.forEach((file, idx) => {
+      const root = 36 + (idx % 60);
+      xml += `      <sample path="${file}" rootNote="${root}" loNote="${root}" hiNote="${root}" loVel="1" hiVel="127"/>\n`;
+    });
+    xml += `    </group>\n  </groups>\n</DecentSampler>\n`;
+    return xml;
+  }
+
+  /* ---------- SoundFont 2 (.sf2) Binary Generator ---------- */
+  function writeAscii(view, offset, str, maxLen) {
+    for (let i = 0; i < maxLen; i++) {
+      view.setUint8(offset + i, i < str.length ? str.charCodeAt(i) : 0);
+    }
+  }
+
+  function makeSf2Chunk(id, data) {
+    const len = data.byteLength;
+    const pad = len % 2;
+    const buf = new Uint8Array(8 + len + pad);
+    const view = new DataView(buf.buffer);
+    writeAscii(view, 0, id, 4);
+    view.setUint32(4, len, true);
+    buf.set(new Uint8Array(data), 8);
+    return buf;
+  }
+
+  function makeSf2List(type, subchunks) {
+    let subLen = 4;
+    for (const c of subchunks) subLen += c.byteLength;
+    const pad = subLen % 2;
+    const buf = new Uint8Array(8 + subLen + pad);
+    const view = new DataView(buf.buffer);
+    writeAscii(view, 0, 'LIST', 4);
+    view.setUint32(4, subLen, true);
+    writeAscii(view, 8, type, 4);
+    let off = 12;
+    for (const c of subchunks) {
+      buf.set(c, off);
+      off += c.byteLength;
+    }
+    return buf;
+  }
+
+  function buildSoundFont2(bankName, samplesList, sampleRate = 44100) {
+    const ifil = new Uint8Array(4);
+    const ifilView = new DataView(ifil.buffer);
+    ifilView.setUint16(0, 2, true);
+    ifilView.setUint16(2, 4, true);
+
+    const isng = new Uint8Array(8);
+    writeAscii(new DataView(isng.buffer), 0, 'EMU8000', 8);
+
+    const inamStr = (bankName || 'Slicer').slice(0, 31) + '\0';
+    const inam = new Uint8Array(inamStr.length + (inamStr.length % 2));
+    writeAscii(new DataView(inam.buffer), 0, inamStr, inam.length);
+
+    const infoList = makeSf2List('INFO', [
+      makeSf2Chunk('ifil', ifil.buffer),
+      makeSf2Chunk('isng', isng.buffer),
+      makeSf2Chunk('INAM', inam.buffer)
+    ]);
+
+    const PADDING_SAMPLES = 46;
+    let totalSmplWords = 0;
+    for (const s of samplesList) {
+      totalSmplWords += s.data.length + PADDING_SAMPLES;
+    }
+    const smplData = new Int16Array(totalSmplWords);
+    const sampleHeaders = [];
+    let currentOffset = 0;
+
+    for (let i = 0; i < samplesList.length; i++) {
+      const s = samplesList[i];
+      const sLen = s.data.length;
+      smplData.set(s.data, currentOffset);
+      const start = currentOffset;
+      const end = currentOffset + sLen;
+      sampleHeaders.push({
+        name: (s.name || `slice_${i + 1}`).slice(0, 19),
+        start,
+        end,
+        startLoop: start,
+        endLoop: end,
+        sampleRate: s.sampleRate || sampleRate,
+        originalKey: s.key || (36 + (i % 60)),
+        pitchCorrection: 0
+      });
+      currentOffset += sLen + PADDING_SAMPLES;
+    }
+
+    const sdtaList = makeSf2List('sdta', [
+      makeSf2Chunk('smpl', smplData.buffer)
+    ]);
+
+    const phdr = new Uint8Array(38 * 2);
+    const phdrView = new DataView(phdr.buffer);
+    writeAscii(phdrView, 0, (bankName || 'Slicer').slice(0, 19), 20);
+    phdrView.setUint16(20, 0, true);
+    phdrView.setUint16(22, 0, true);
+    phdrView.setUint16(24, 0, true);
+    writeAscii(phdrView, 38, 'EOP', 20);
+    phdrView.setUint16(38 + 20, 0, true);
+    phdrView.setUint16(38 + 22, 0, true);
+    phdrView.setUint16(38 + 24, 1, true);
+
+    const pbag = new Uint8Array(4 * 2);
+    const pbagView = new DataView(pbag.buffer);
+    pbagView.setUint16(0, 0, true);
+    pbagView.setUint16(2, 0, true);
+    pbagView.setUint16(4, 1, true);
+    pbagView.setUint16(6, 0, true);
+
+    const pmod = new Uint8Array(10);
+
+    const pgen = new Uint8Array(4 * 2);
+    const pgenView = new DataView(pgen.buffer);
+    pgenView.setUint16(0, 41, true); // instrument generator
+    pgenView.setUint16(2, 0, true);  // Instrument 0
+    pgenView.setUint16(4, 0, true);
+    pgenView.setUint16(6, 0, true);
+
+    const inst = new Uint8Array(22 * 2);
+    const instView = new DataView(inst.buffer);
+    writeAscii(instView, 0, 'Kit', 20);
+    instView.setUint16(20, 0, true);
+    writeAscii(instView, 22, 'EOI', 20);
+    instView.setUint16(22 + 20, samplesList.length, true);
+
+    const numSamples = samplesList.length;
+    const ibag = new Uint8Array(4 * (numSamples + 1));
+    const ibagView = new DataView(ibag.buffer);
+    const GENS_PER_SAMPLE = 3;
+    for (let i = 0; i < numSamples; i++) {
+      ibagView.setUint16(i * 4, i * GENS_PER_SAMPLE, true);
+      ibagView.setUint16(i * 4 + 2, 0, true);
+    }
+    ibagView.setUint16(numSamples * 4, numSamples * GENS_PER_SAMPLE, true);
+    ibagView.setUint16(numSamples * 4 + 2, 0, true);
+
+    const imod = new Uint8Array(10);
+
+    const totalIgens = numSamples * GENS_PER_SAMPLE + 1;
+    const igen = new Uint8Array(4 * totalIgens);
+    const igenView = new DataView(igen.buffer);
+    for (let i = 0; i < numSamples; i++) {
+      const key = samplesList[i].key || (36 + (i % 60));
+      const baseOff = (i * GENS_PER_SAMPLE) * 4;
+      igenView.setUint16(baseOff, 43, true); // keyRange
+      igenView.setUint8(baseOff + 2, key);
+      igenView.setUint8(baseOff + 3, key);
+      igenView.setUint16(baseOff + 4, 58, true); // overridingRootKey
+      igenView.setUint16(baseOff + 6, key, true);
+      igenView.setUint16(baseOff + 8, 53, true); // sampleID
+      igenView.setUint16(baseOff + 10, i, true);
+    }
+
+    const shdr = new Uint8Array(46 * (numSamples + 1));
+    const shdrView = new DataView(shdr.buffer);
+    for (let i = 0; i < numSamples; i++) {
+      const s = sampleHeaders[i];
+      const off = i * 46;
+      writeAscii(shdrView, off, s.name, 20);
+      shdrView.setUint32(off + 20, s.start, true);
+      shdrView.setUint32(off + 24, s.end, true);
+      shdrView.setUint32(off + 28, s.startLoop, true);
+      shdrView.setUint32(off + 32, s.endLoop, true);
+      shdrView.setUint32(off + 36, s.sampleRate, true);
+      shdrView.setUint8(off + 40, s.originalKey);
+      shdrView.setInt8(off + 41, s.pitchCorrection);
+      shdrView.setUint16(off + 42, 0, true);
+      shdrView.setUint16(off + 44, 1, true); // monoSample
+    }
+    writeAscii(shdrView, numSamples * 46, 'EOS', 20);
+
+    const pdtaList = makeSf2List('pdta', [
+      makeSf2Chunk('phdr', phdr.buffer),
+      makeSf2Chunk('pbag', pbag.buffer),
+      makeSf2Chunk('pmod', pmod.buffer),
+      makeSf2Chunk('pgen', pgen.buffer),
+      makeSf2Chunk('inst', inst.buffer),
+      makeSf2Chunk('ibag', ibag.buffer),
+      makeSf2Chunk('imod', imod.buffer),
+      makeSf2Chunk('igen', igen.buffer),
+      makeSf2Chunk('shdr', shdr.buffer)
+    ]);
+
+    const totalPayload = 4 + infoList.byteLength + sdtaList.byteLength + pdtaList.byteLength;
+    const riffBuf = new Uint8Array(8 + totalPayload);
+    const riffView = new DataView(riffBuf.buffer);
+    writeAscii(riffView, 0, 'RIFF', 4);
+    riffView.setUint32(4, totalPayload, true);
+    writeAscii(riffView, 8, 'sfbk', 4);
+
+    let p = 12;
+    riffBuf.set(infoList, p);
+    p += infoList.byteLength;
+    riffBuf.set(sdtaList, p);
+    p += sdtaList.byteLength;
+    riffBuf.set(pdtaList, p);
+
+    return riffBuf.buffer;
+  }
+
+  function prepareSf2Samples(sliceRegions) {
+    const norm = $('#norm').value === '1';
+    const list = [];
+    sliceRegions.forEach((r, idx) => {
+      const chs = render(r);
+      if (norm) normalizeAudio(chs);
+      const monoData = chs[0];
+      const int16Data = new Int16Array(monoData.length);
+      for (let i = 0; i < monoData.length; i++) {
+        const s = Math.max(-1, Math.min(1, monoData[i]));
+        int16Data[i] = s < 0 ? s * 32768 : s * 32767;
+      }
+      const key = 36 + (idx % 60);
+      const tag = r.tag || 'slice';
+      list.push({
+        name: `${tag}_${pad(idx + 1)}`,
+        data: int16Data,
+        key: key,
+        sampleRate: sr
+      });
+    });
+    return list;
+  }
+
+  /* ---------- Direct SF2, SFZ, and MIDI Download Buttons ---------- */
+  $('#btnDlSf2').onclick = () => {
+    const sel2 = regions.filter(r => r.on);
+    if (!sel2.length) { st('Select at least one slice to export.'); return; }
+    st('Building SF2 SoundFont…');
+    const base = ($('#pfx').value || '').trim().replace(/[^\w-]+/g, '_') || name;
+    const sf2Samples = prepareSf2Samples(sel2);
+    const sf2Buf = buildSoundFont2(base, sf2Samples, sr);
+    const blob = new Blob([sf2Buf], { type: 'audio/x-soundfont' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${base}.sf2`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    st(`Downloaded ${base}.sf2 (SoundFont 2) for Mighty Synth / iOS`);
+  };
+
+  $('#btnDlSfz').onclick = () => {
+    const sel2 = regions.filter(r => r.on);
+    if (!sel2.length) { st('Select at least one slice to export.'); return; }
+    const base = ($('#pfx').value || '').trim().replace(/[^\w-]+/g, '_') || name;
+    const sliceFileNames = sel2.map((r, i) =>
+      mode === 'loop' ? `${base}_loop_${Math.round(bpm)}bpm_${$('#bars').value}bar_${pad(i + 1)}.wav` : `${base}_${r.tag || 'shot'}_${pad(i + 1)}.wav`
+    );
+    const sfzText = generateSfz(sliceFileNames);
+    const blob = new Blob([sfzText], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${base}_kit.sfz`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    st(`Downloaded ${base}_kit.sfz (Mighty Synth compatible)`);
+  };
+
+  $('#btnDlMidi').onclick = () => {
+    const sel2 = regions.filter(r => r.on);
+    if (!sel2.length) { st('Select at least one slice to export.'); return; }
+    const base = ($('#pfx').value || '').trim().replace(/[^\w-]+/g, '_') || name;
+    const midiBuffer = generateMidi(sel2, bpm || 120);
+    const blob = new Blob([midiBuffer], { type: 'audio/midi' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${base}_slices.mid`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    st(`Downloaded ${base}_slices.mid (MIDI file)`);
+  };
+
+  /* ---------- Complete ZIP Package Export ---------- */
   $('#exp').onclick = async () => {
     const sel2 = regions.filter(r => r.on);
     if (!sel2.length) {
@@ -1707,50 +2632,63 @@
     const base = ($('#pfx').value || '').trim().replace(/[^\w-]+/g, '_') || name;
     const bits = +$('#bits').value;
     const norm = $('#norm').value === '1';
+    const folderName = base + (mode === 'loop' ? '_loops' : '_kit');
     const zip = new JSZip();
-    const folder = zip.folder(base + (mode === 'loop' ? '_loops' : '_oneshots'));
+    const folder = zip.folder(folderName);
+    const sliceFileNames = [];
 
     try {
       for (let i = 0; i < sel2.length; i++) {
         st(`Rendering slice ${i + 1} of ${sel2.length}…`);
         await new Promise(r => setTimeout(r, 0));
         const chs = render(sel2[i]);
-        if (norm) {
-          let pk = 0;
-          chs.forEach(c => {
-            for (let j = 0; j < c.length; j++) {
-              const a = Math.abs(c[j]);
-              if (a > pk) pk = a;
-            }
-          });
-          if (pk > 0) {
-            const g = 0.891 / pk;
-            chs.forEach(c => {
-              for (let j = 0; j < c.length; j++) c[j] *= g;
-            });
-          }
-        }
+        if (norm) normalizeAudio(chs);
+
         const fn = mode === 'loop'
           ? `${base}_loop_${Math.round(bpm)}bpm_${$('#bars').value}bar_${pad(i + 1)}.wav`
-          : `${base}_shot_${pad(i + 1)}.wav`;
+          : `${base}_${sel2[i].tag || 'shot'}_${pad(i + 1)}.wav`;
+
         folder.file(fn, wav(chs, bits));
+        sliceFileNames.push(fn);
       }
 
+      // Include Standard MIDI Slicing Map if checked
+      if ($('#chkMidi').checked) {
+        st('Generating MIDI trigger sequence…');
+        const midiBuffer = generateMidi(sel2, bpm || 120);
+        folder.file(`${base}_slices.mid`, midiBuffer);
+      }
+
+      // Include SFZ and DecentSampler Instruments if checked
+      if ($('#chkSfz').checked) {
+        st('Building sampler presets (SFZ & DecentSampler)…');
+        folder.file(`${base}_kit.sfz`, generateSfz(sliceFileNames));
+        folder.file(`${base}_preset.dspreset`, generateDecentSamplerPreset(base, sliceFileNames));
+      }
+
+      // Include SF2 SoundFont Bank if checked
+      if ($('#chkSf2').checked) {
+        st('Building SF2 SoundFont bank…');
+        const sf2Samples = prepareSf2Samples(sel2);
+        folder.file(`${base}.sf2`, buildSoundFont2(base, sf2Samples, sr));
+      }
+
+      // Session Info Log
       const info = mode === 'loop'
-        ? `Source: ${name}\nMode: loops\nTempo: ${bpm} BPM\nLength: ${$('#bars').value} bar(s)\nCrossfade: ${$('#fade').value} ms\n`
+        ? `Source: ${name}\nMode: loops\nTempo: ${bpm} BPM\nLength: ${$('#bars').value} bar(s)\nCrossfade: ${$('#fade').value} ms (${$('#fadeCurve').value})\n`
         : `Source: ${name}\nMode: one-shots\nSensitivity: ${$('#sens').value} dB\nMin gap: ${$('#gap').value} ms\nFade out: ${$('#fade').value} ms\n`;
-      folder.file('info.txt', info + `Slices: ${sel2.length}\nFormat: ${bits}-bit WAV, ${sr} Hz\nExported: ${new Date().toISOString()}\n`);
+      folder.file('info.txt', info + `Slices: ${sel2.length}\nFormat: ${bits}-bit WAV, ${sr} Hz\nFeatures: MIDI map, SFZ instrument (Mighty Synth compatible), SF2 SoundFont, DecentSampler preset\nExported: ${new Date().toISOString()}\n`);
 
       st('Compressing ZIP archive…');
       const blob = await zip.generateAsync({ type: 'blob' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `${base}_${mode === 'loop' ? 'loops' : 'oneshots'}.zip`;
+      a.download = `${base}_${mode === 'loop' ? 'loops' : 'kit'}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-      st(`Exported ${sel2.length} slice${sel2.length > 1 ? 's' : ''} successfully.`);
+      st(`Exported ${sel2.length} slice${sel2.length > 1 ? 's' : ''} + sampler kit successfully.`);
     } catch (err) {
       st('Export failed: ' + err.message);
     }

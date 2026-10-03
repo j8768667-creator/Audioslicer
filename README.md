@@ -1,6 +1,6 @@
 # Slicer ✂️
 
-A high-precision, self-contained, browser-based audio and video sample slicer. Automatically detect transients for one-shot drum hits and sound effects, or detect tempo (BPM) and bar grid boundaries for seamless looping samples. Export your slices directly as 16-bit or 24-bit broadcast-grade WAV files inside a compressed ZIP archive.
+A high-precision, self-contained, browser-based audio and video sample slicer and sampler kit builder. Automatically detect transients for one-shot drum hits, classify drum sounds (Kick, Snare, Hi-Hat, Perc), or detect tempo (BPM) and bar grid boundaries for seamless looping samples. Export your slices directly as 16-bit or 24-bit broadcast-grade WAV files, standard MIDI maps (`.mid`), and complete sampler presets (`.sfz` and DecentSampler `.dspreset`) inside a compressed ZIP archive.
 
 Works 100% locally in your browser using the HTML5 Web Audio API, Canvas 2D, and JSZip. Zero server uploads, zero latency, zero telemetry.
 
@@ -8,27 +8,41 @@ Works 100% locally in your browser using the HTML5 Web Audio API, Canvas 2D, and
 
 ## ✨ Features
 
-- **Dual Slicing Engines**:
-  - **One-Shot Mode**: RMS onset & transient energy detection with configurable sensitivity (dB) and minimum hit gap (ms).
-  - **Loop Mode**: Automatic tempo (BPM) detection using onset autocorrelation with parabolic sub-sample peak interpolation. Quantizes to 1, 2, 4, or 8-bar boundaries with beat-grid snapping.
-- **Interactive Multi-Level Waveforms**:
-  - **Overview Canvas**: Full-track visualization with draggable slice boundaries, active playhead tracking, and manual marker placement.
-  - **Zoom Slice Editor**: High-resolution zoom view with pinch-to-zoom, mouse wheel zoom, pan, and interactive boundary handles.
-  - **Zero-Crossing Snapping**: Auto-aligns slice start and end points to zero-amplitude crossings within a ±2 ms window to eliminate clicks and pops.
-  - **Micro-Nudge Controls**: Precision ±1 ms and ±10 ms adjustment buttons for surgical editing.
-  - **Slice Management**: Split at marker, merge with adjacent slice, delete slice, and reset to automatic detection.
-- **Seam Auditioning**:
-  - Test loop continuity with **Seam ×4** playback, applying real-time loop crossfades so you know your loops groove seamlessly before exporting.
-- **Audio Rendering & Export**:
-  - **Format Options**: Studio 24-bit WAV or standard 16-bit PCM WAV.
-  - **Level Normalization**: Optional one-click peak normalization to −1 dBFS.
-  - **Crossfading & Fades**: Configurable 0–100 ms linear crossfade or edge fade-out.
-  - **ZIP Packaging**: Packages all selected slices alongside an `info.txt` session log containing source metadata, tempo, and slice parameters.
-- **Productivity & Workflow**:
-  - **Drag & Drop**: Drag audio or video files directly onto the browser window.
-  - **50-Step Undo History**: Safe non-destructive editing (`Ctrl+Z` / `Cmd+Z`).
-  - **Session Persistence**: Saves slice markers and tempo to `localStorage`, with automatic restore prompts on reload.
-  - **Keyboard Shortcuts**: `Space` to play/pause selected slice, `Escape` to close editor, `Ctrl/Cmd+Z` to undo.
+### 🎧 Dual Slicing Engines
+- **One-Shot Mode**: RMS onset & transient energy detection with configurable sensitivity (dB) and minimum hit gap (ms).
+- **Dynamic Threshold Guide**: Real-time visual overlay on the waveform demonstrating exact transient trigger boundaries.
+- **Loop Mode**: Automatic tempo (BPM) detection using onset autocorrelation with parabolic sub-sample peak interpolation. Quantizes to 1, 2, 4, or 8-bar boundaries with beat-grid snapping.
+- **Click & Drag Region Creation**: Draw custom slices directly on empty canvas areas with automatic zero-crossing snapping.
+
+### 🔬 Intelligent Transient Classification
+- Automatically classifies one-shot slices into **Kick**, **Snare**, **Hi-Hat**, **Perc**, or **Sample/FX** using spectral centroid, high-frequency energy ratio, and zero-crossing rate analysis.
+- Color-coded tag pills on every slice card.
+- Automatic descriptive naming on export (e.g. `Song_kick_01.wav`, `Song_snare_02.wav`).
+
+### 📊 Waveform & Spectrogram Views
+- **Waveform Overview**: Full-track visualization with draggable slice boundaries, active playhead tracking, and manual marker placement.
+- **Interactive Fourier Spectrogram**: Switch seamlessly between time-domain waveform and multi-color Short-Time Fourier Transform (STFT) frequency heatmap.
+- **Zoom Slice Editor**: High-resolution zoom view with pinch-to-zoom, mouse wheel zoom, pan, and interactive boundary handles.
+- **Zero-Crossing Snapping**: Auto-aligns slice start and end points to zero-amplitude crossings within a ±2 ms window to eliminate clicks and pops.
+- **Micro-Nudge Controls**: Precision ±1 ms and ±10 ms adjustment buttons for surgical editing.
+
+### 🎛️ Per-Slice Sound Shaping
+- **⇄ Reverse**: Non-destructive reverse playback and reversed WAV export.
+- **Gain Trim**: Adjust individual slice level by ±12 dB.
+- **Pitch Transposition**: Semi-tone coarse tuning (±12 semitones) with real-time audition and sinc-interpolated resampling on export.
+- **Editor Loop Audition**: Toggle looped playback directly within the zoom editor to fine-tune slice boundaries.
+
+### 🔄 Advanced Crossfading & Seam Auditioning
+- **Equal-Power (3 dB) Crossfade**: Sine/cosine power-preserving crossfade curve prevents volume dips at loop seams.
+- **Linear Crossfade**: Traditional linear crossfading (0 to 100 ms).
+- **Seam ×4 Auditioning**: Seamlessly audition loop transitions with 4 repetitions before exporting.
+
+### 🎹 Sampler Kit & MIDI Export
+- **Standard MIDI Map (`.mid`)**: Automatically generates a Type 0 MIDI file with chromatic trigger notes (C1, C#1, D1, etc.) mapped to the exact slice timing to rebuild the groove in any DAW.
+- **SFZ Sampler Patch (`.sfz`)**: Universal open-format instrument mapping for Sforzando, LinuxSampler, and hardware samplers.
+- **DecentSampler Preset (`.dspreset`)**: Ready-to-play multi-sample preset for DecentSampler (free VST/AU/AAX/iOS).
+- **Direct Drag-Out**: Drag slice cards directly out of the browser into compatible DAWs (Ableton, Bitwig, Reaper) or desktop folders.
+- **1-Click Individual WAV Download**: Download any slice instantly with applied gain, pitch, reverse, and normalization.
 
 ---
 
@@ -58,7 +72,7 @@ npm run dev
    ```bash
    git init -b main
    git add .
-   git commit -m "Initial commit: Slicer - Audio One-Shot & Loop Slicer"
+   git commit -m "feat: complete audio slicer and sampler workstation"
    ```
 
 2. **Create a new repository on GitHub**:
@@ -100,7 +114,7 @@ Once pushed to GitHub, you can host Slicer for free via GitHub Pages:
 ## 🎹 Supported Audio & Video Formats
 
 Any format supported by your browser's Web Audio API decoding engine:
-- `.wav`, `.mp3`, `.m4a`, `.aac`, `.flac`, `.ogg`
+- `.wav`, `.mp3`, `.m4a`, `.aac`, `.flac`, `.ogg`, `.opus`, `.aiff`
 - Video audio tracks: `.mp4`, `.mov`, `.webm`
 
 ---
